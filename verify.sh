@@ -4,7 +4,7 @@ set -uo pipefail
 cd "$(dirname "$0")"
 
 FAILED=0
-step() { echo; echo "══ ⚙︎  $*"; }
+step() { echo; echo "== $*"; }
 
 step "Compilation (py_compile)"
 for f in adb.py backup.py bloat_db.py debloat_gui.py debloat_cli.py; do
@@ -34,8 +34,8 @@ fi
 
 step "Résultat global"
 if [ "$FAILED" -eq 0 ]; then
-  echo "✅ Vérification complète passée."
+  echo "Vérification complète passée."
 else
-  echo "❌ Échecs détectés — voir ci-dessus."
+  echo "Échecs détectés — voir ci-dessus."
 fi
 exit "$FAILED"

@@ -7,7 +7,7 @@ Format :
 
 Recherche par préfixe gérée par FORBIDDEN_PREFIXES (ex. tout `com.android.*`).
 
-⚠️ La base s'appuie sur l'état de l'art public (guides de débloat communautaires).
+La base s'appuie sur l'état de l'art public (guides de débloat communautaires).
 Elle n'est PAS exhaustive : un paquet absent de cette base apparaît comme « inconnu »
 dans l'interface, à évaluer par l'utilisateur.
 """
@@ -73,7 +73,7 @@ BLOAT_DB: dict[str, tuple[str, str, str]] = {
     "com.google.android.gm": (A, "Gmail", "À retirer seulement si vous utilisez un autre client mail."),
     "com.google.android.googlequicksearchbox": (A, "Barre de recherche Google", "Widget du bureau ; le retrait peut casser l'assistant."),
     # ============================================================= Microsoft
-    "com.microsoft.appmanager": (A, "Link to Windows", "Connexion téléphone ↔ PC."),
+    "com.microsoft.appmanager": (A, "Link to Windows", "Connexion téléphone <-> PC."),
     "com.microsoft.skydrive": (A, "OneDrive", "Cloud Microsoft."),
     "com.microsoft.office.officehubrow": (A, "Microsoft 365 (Office)", "Suite bureautique préinstallée."),
     "com.microsoft.office.outlook": (A, "Outlook", "Client mail Microsoft."),
@@ -122,7 +122,7 @@ BLOAT_DB: dict[str, tuple[str, str, str]] = {
     "com.samsung.android.messaging": (A, "Messages Samsung", "Souvent app SMS PAR DÉFAUT : remplacez-la avant."),
     "com.sec.android.daemonapp": (A, "Framework météo Samsung", "Widget météo ; certains widgets dépendent de lui."),
     "com.sec.spp.push": (A, "Samsung Push Service", "Notifications des apps Samsung."),
-    "com.sec.android.app.clockpackage": (A, "Horloge & alarmes", "⚠️ Contient l'alarme système Samsung."),
+    "com.sec.android.app.clockpackage": (A, "Horloge & alarmes", "Contient l'alarme système Samsung."),
     "com.samsung.android.app.cocktailbarservice": (A, "Edge Panels", "Panneaux latéraux."),
     "com.samsung.android.app.dressroom": (A, "Fonds & thèmes", "Édition de thèmes/fonds."),
     "com.samsung.android.stickercenter": (S, "Centre de stickers", "Gestion des stickers."),
@@ -143,7 +143,7 @@ BLOAT_DB: dict[str, tuple[str, str, str]] = {
     "com.miui.cloudbackup": (A, "Sauvegarde Mi Cloud", "Sauvegarde cloud Xiaomi."),
     "com.miui.player": (A, "Mi Musique", "App musique Xiaomi."),
     "com.miui.videoplayer": (A, "Mi Vidéo", "App vidéo Xiaomi."),
-    "com.miui.gallery": (A, "Galerie (MIUI)", "⚠️ Si vous l'utilisez comme app photos."),
+    "com.miui.gallery": (A, "Galerie (MIUI)", "Si vous l'utilisez comme app photos."),
     "com.miui.weather2": (A, "Météo (MIUI)", "App météo/widget."),
     "com.miui.fm": (A, "Radio FM", "À garder si vous écoutez la radio."),
     "com.xiaomi.mipicks": (A, "GetApps", "Boutique d'applications Xiaomi."),

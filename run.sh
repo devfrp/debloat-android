@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 if ! command -v adb >/dev/null 2>&1; then
-  echo "❌ adb n'est pas installé."
+  echo "adb introuvable. Installe-le (sudo apt install adb) ou définis ADB_PATH."
   echo
   echo "Installe-le avec :"
   echo "  Debian/Ubuntu : sudo apt install adb"

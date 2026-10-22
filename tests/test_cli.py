@@ -143,6 +143,22 @@ class UninstallGuards(CliHarness):
         data = _load(self.backup_path())
         self.assertEqual(data["history"][0]["type"], "user")
 
+    def test_backup_apks_flag_saves_apk(self):
+        code, out, _ = self.cli("uninstall", "com.facebook.appmanager",
+                                "--backup-apks", "--yes")
+        self.assertEqual(code, 0, out)
+        apk = os.path.join(self._tmp.name, "123ABC", "apks",
+                           "com.facebook.appmanager", "base.apk")
+        self.assertTrue(os.path.exists(apk), out)
+        self.assertIn("APK sauvegardé", out)
+        self.assertIn("com.facebook.appmanager retiré", out)
+
+    def test_without_flag_no_apk_saved(self):
+        code, _, _ = self.cli("uninstall", "com.facebook.appmanager", "--yes")
+        self.assertEqual(code, 0)
+        self.assertFalse(os.path.exists(os.path.join(self._tmp.name, "123ABC", "apks")))
+        self.assertEqual(self.fake.pulled, [])
+
     def test_missing_package(self):
         code, _, err = self.cli("uninstall", "org.truc.rien")
         self.assertEqual(code, debloat_cli.EXIT_ERR)
@@ -160,7 +176,7 @@ class UninstallGuards(CliHarness):
                                                                   "Failure [x]")
         code, out, _ = self.cli("uninstall", "com.facebook.appmanager", "--yes")
         self.assertEqual(code, debloat_cli.EXIT_ERR)
-        self.assertIn("✖ com.facebook.appmanager", out)
+        self.assertIn("Échec  com.facebook.appmanager", out)
         self.assertFalse(os.path.exists(self.backup_path()))
         self.assertEqual(self.fake.uninstalled, [("com.facebook.appmanager", False)])
 

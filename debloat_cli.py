@@ -37,13 +37,7 @@ RISK_ORDER = {
     bloat_db.RISK_FORBIDDEN: 3,
 }
 
-ICON = {
-    bloat_db.RISK_SAFE: "✅",
-    bloat_db.RISK_ADVANCED: "🟠",
-    bloat_db.RISK_UNKNOWN: "❔",
-    bloat_db.RISK_FORBIDDEN: "⛔",
-    "user": "📦",
-}
+
 
 EXIT_OK, EXIT_ERR, EXIT_REFUSED = 0, 1, 2
 
@@ -70,14 +64,14 @@ def pick_adb(args) -> Adb:
     devices = Adb().list_devices()
     usable = [d for d in devices if d.state == "device"]
     if not usable:
-        print("❌ Aucun appareil ADB utilisable. Câble + débogage USB + autorisation.",
+        print("Aucun appareil ADB utilisable. Câble + débogage USB + autorisation.",
               file=sys.stderr)
         raise SystemExit(EXIT_ERR)
     for dev in devices:
         if dev.state != "device":
-            print(f"⚠️ {dev.serial} : état « {dev.state} » ignoré.", file=sys.stderr)
+            print(f"{dev.serial} : état « {dev.state} » ignoré.", file=sys.stderr)
     if len(usable) > 1:
-        print("❌ Plusieurs appareils connectés — précise --serial parmi :", file=sys.stderr)
+        print("Plusieurs appareils connectés — précise --serial parmi :", file=sys.stderr)
         for dev in usable:
             print(f"   {dev.serial}   {dev.model or '?'}", file=sys.stderr)
         raise SystemExit(EXIT_ERR)
@@ -131,7 +125,7 @@ def cmd_scan(args) -> int:
         print(f"Appareil : {_device_label(props, adb.serial)}"
               + (f"  —  filtre « {args.search} »" if query else ""))
         print(f"Total : {len(apps)} app(s) — "
-              + " • ".join(f"{ICON[r]} {r} {counts[r]}" for r in
+              + " • ".join(f"{r} {counts[r]}" for r in
                            ("safe", "advanced", "unknown", "forbidden", "user")))
         print("-" * 78)
         for pkg in shown:
@@ -142,7 +136,7 @@ def cmd_scan(args) -> int:
                 suffix = f"  ({info['label']})"
             else:
                 suffix = ""
-            print(f"{ICON[info['risk']]} {pkg}{suffix}")
+            print(f"{pkg}{suffix}")
     if not shown and (args.search or want_risks):
         print("(aucune app correspondante)")
 
@@ -168,9 +162,9 @@ def cmd_scan(args) -> int:
             with open(args.report, "w", encoding="utf-8") as fh:
                 json.dump(payload, fh, indent=1, ensure_ascii=False)
         except OSError as exc:
-            print(f"❌ Écriture du rapport impossible : {exc}", file=sys.stderr)
+            print(f"Écriture du rapport impossible : {exc}", file=sys.stderr)
             return EXIT_ERR
-        print(f"📄 Rapport écrit : {args.report}")
+        print(f"Rapport écrit : {args.report}")
     return EXIT_OK
 
 
@@ -182,7 +176,7 @@ def cmd_uninstall(args) -> int:
     targets: list[str] = []
     for pkg in args.packages:
         if pkg not in apps:
-            print(f"❌ {pkg} n'est pas installé sur l'appareil.", file=sys.stderr)
+            print(f"{pkg} n'est pas installé sur l'appareil.", file=sys.stderr)
             return EXIT_ERR
         targets.append(pkg)
 
@@ -192,18 +186,18 @@ def cmd_uninstall(args) -> int:
     users = [p for p in targets if apps[p]["type"] == "user"]
 
     if forbidden:
-        print("⛔ Refusé : composants système protégés", file=sys.stderr)
+        print("Refusé : composants système protégés", file=sys.stderr)
         for pkg in forbidden:
             print(f"   {pkg}   {bloat_db.lookup(pkg)[1]}", file=sys.stderr)
         return EXIT_REFUSED
     if unknown and not args.allow_unknown:
-        print("❔ Refusé : paquet(s) inconnu(s) de la base — relance avec --allow-unknown "
+        print("Refusé : paquet(s) inconnu(s) de la base — relance avec --allow-unknown "
               "si tu sais ce que tu fais :", file=sys.stderr)
         for pkg in unknown:
             print(f"   {pkg}", file=sys.stderr)
         return EXIT_REFUSED
     if users and not args.allow_user_apps:
-        print("📦 Refusé : app(s) utilisateur — la suppression est DÉFINITIVE (données "
+        print("Refusé : app(s) utilisateur — la suppression est DÉFINITIVE (données "
               "perdues). Relance avec --allow-user-apps si nécessaire :", file=sys.stderr)
         for pkg in users:
             print(f"   {pkg}", file=sys.stderr)
@@ -220,11 +214,14 @@ def cmd_uninstall(args) -> int:
     counts = Counter(apps[p]["risk"] for p in targets)
     if not _confirm(
             f"Retirer {len(targets)} app(s) sur {device} "
-            f"(✅ {counts['safe']} • 🟠 {counts['advanced']} • "
-            f"❔ {counts['unknown']} • 📦 {counts['user']}) ?",
+            f"(sûres {counts['safe']} • avancées {counts['advanced']} • "
+            f"inconnues {counts['unknown']} • utilisateur {counts['user']}) ?",
             args.yes):
         print("Abandon.")
         return EXIT_OK
+
+    if args.backup_apks:
+        _save_apks(adb, targets)
 
     failures = 0
     for pkg in targets:
@@ -236,23 +233,56 @@ def cmd_uninstall(args) -> int:
         except AdbError as exc:
             ok, out = False, str(exc)
         if ok:
-            print(f"✔ {pkg} retiré.")
+            print(f"OK  {pkg} retiré.")
             path = backup.backup_path(adb.serial)
             good, message = backup.append_backup(path, adb.serial, device, pkg,
                                                  apps[pkg]["type"])
             if not good:
-                print(f"❌ {message}", file=sys.stderr)
+                print(message, file=sys.stderr)
             elif message:
-                print(f"⚠️ {message}", file=sys.stderr)
+                print(message, file=sys.stderr)
         else:
             failures += 1
-            print(f"✖ {pkg} : {out or 'échec'}")
+            print(f"Échec  {pkg} : {out or 'échec'}")
     if failures:
-        print(f"→ {len(targets) - failures} ok, {failures} échec(s).")
+        print(f"{len(targets) - failures} ok, {failures} échec(s).")
         return EXIT_ERR
-    print(f"→ {len(targets)} retrait(s) réussi(s) — consigné(s) dans "
+    print(f"{len(targets)} retrait(s) réussi(s) — consigné(s) dans "
           f"backups/{backup.safe_filename(adb.serial)}.json")
     return EXIT_OK
+
+
+def _save_apks(adb: Adb, targets: list[str]) -> None:
+    """Copie les APK de la cible dans backups/<serial>/apks/<paquet>/ avant retrait."""
+    try:
+        root = backup.apks_dir(adb.serial)
+    except OSError as exc:
+        print(f"Impossible de créer le dossier des APK : {exc}", file=sys.stderr)
+        return
+    for pkg in targets:
+        try:
+            paths = adb.app_apk_paths(pkg)
+        except AdbError as exc:
+            print(f"APK non sauvegardé ({pkg}) : {exc}", file=sys.stderr)
+            continue
+        if not paths:
+            print(f"APK introuvable sur l'appareil ({pkg}).", file=sys.stderr)
+            continue
+        dest = os.path.join(root, pkg)
+        try:
+            os.makedirs(dest, exist_ok=True)
+        except OSError as exc:
+            print(f"APK non sauvegardé ({pkg}) : {exc}", file=sys.stderr)
+            continue
+        pulled = 0
+        for remote in paths:
+            good, _out = adb.pull_apk(remote, dest)
+            if good:
+                pulled += 1
+        if pulled:
+            print(f"APK sauvegardé : {pkg} ({pulled} fichier(s) -> {dest})")
+        else:
+            print(f"Échec de la sauvegarde APK ({pkg}).", file=sys.stderr)
 
 
 def cmd_restore(args) -> int:
@@ -261,14 +291,14 @@ def cmd_restore(args) -> int:
     else:
         files = backup.list_backup_files()
         if not files:
-            print("❌ Aucun backup dans backups/ — rien à restaurer.", file=sys.stderr)
+            print("Aucun backup dans backups/ — rien à restaurer.", file=sys.stderr)
             return EXIT_ERR
         path = files[0]
         others = ", ".join(os.path.basename(f) for f in files[1:4])
         print(f"(backup le plus récent{'; autres : ' + others if others else ''})")
     data, err = backup.read_backup(path)
     if data is None:
-        print(f"❌ Lecture du backup impossible : {err}", file=sys.stderr)
+        print(f"Lecture du backup impossible : {err}", file=sys.stderr)
         return EXIT_ERR
     serial = data.get("serial")
     entries = backup.entries(data)
@@ -278,7 +308,7 @@ def cmd_restore(args) -> int:
 
     adb = pick_adb(args)
     if serial and args.serial and serial != args.serial:
-        print(f"⚠️ le backup provient d'un autre appareil ({serial}), "
+        print(f"Le backup provient d'un autre appareil ({serial}), "
               f"cible : {args.serial}.", file=sys.stderr)
 
     if args.dry_run:
@@ -300,7 +330,7 @@ def cmd_restore(args) -> int:
     for entry in entries:
         pkg = entry.get("package") or ""
         if entry.get("type") == "user":
-            print(f"↩️ {pkg} : app utilisateur — réinstalle-la à la main.")
+            print(f"{pkg} : app utilisateur — réinstalle-la à la main.")
             skipped += 1
             continue
         try:
@@ -308,17 +338,17 @@ def cmd_restore(args) -> int:
         except AdbError as exc:
             ok, out = False, str(exc)
         if ok:
-            print(f"✔ {pkg} restauré.")
+            print(f"OK  {pkg} restauré.")
         else:
             failures += 1
-            print(f"✖ {pkg} : {out or 'échec'}")
+            print(f"Échec  {pkg} : {out or 'échec'}")
     done = len(entries) - skipped
     if skipped:
         print(f"({skipped} app(s) utilisateur ignorée(s))")
     if failures:
-        print(f"→ {done - failures} ok, {failures} échec(s).")
+        print(f"{done - failures} ok, {failures} échec(s).")
         return EXIT_ERR
-    print(f"→ {done} restauration(s) réussie(s) (redémarre le téléphone au besoin).")
+    print(f"{done} restauration(s) réussie(s) (redémarre le téléphone au besoin).")
     return EXIT_OK
 
 
@@ -348,6 +378,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_un.add_argument("--allow-user-apps", action="store_true",
                       help="autoriser la suppression définitive d'apps utilisateur")
     p_un.add_argument("--dry-run", action="store_true", help="afficher sans exécuter")
+    p_un.add_argument("--backup-apks", action="store_true",
+                      help="sauvegarder les APK de la sélection dans backups/<serial>/apks/ "
+                           "avant le retrait (l utilisateur doit le demander explicitement)")
     p_un.add_argument("--yes", "-y", action="store_true", help="ne pas demander confirmation")
     p_un.set_defaults(func=cmd_uninstall)
 
@@ -365,7 +398,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return int(args.func(args))
     except AdbError as exc:
-        print(f"❌ {exc}", file=sys.stderr)
+        print(exc, file=sys.stderr)
         return EXIT_ERR
     except KeyboardInterrupt:
         print("\ninterrompu", file=sys.stderr)

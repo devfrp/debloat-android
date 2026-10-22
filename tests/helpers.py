@@ -35,6 +35,8 @@ class FakeAdb:
         self.raise_on_uninstall = raise_on_uninstall
         self.uninstalled: list[tuple[str, bool]] = []
         self.restored: list[str] = []
+        self.pulled: list[tuple[str, str]] = []
+        self.fail_pull = False
         self.props_out = (
             "[ro.product.brand]: [Google]\n"
             "[ro.product.manufacturer]: [google]\n"
@@ -77,6 +79,20 @@ class FakeAdb:
     def install_existing(self, package: str):
         self.restored.append(package)
         return (True, "Success")
+
+    def app_apk_paths(self, package: str):
+        return [f"/data/app/{package}/base.apk"]
+
+    def pull_apk(self, remote: str, dest_dir: str):
+        import os
+        self.pulled.append((remote, dest_dir))
+        if self.fail_pull:
+            return (False, "fake-pull failure")
+        os.makedirs(dest_dir, exist_ok=True)
+        name = remote.rsplit("/", 1)[-1]
+        with open(os.path.join(dest_dir, name), "w", encoding="utf-8") as fh:
+            fh.write("APK")
+        return (True, f"{name} pulled to {dest_dir}")
 
 
 def patch_adb(module_obj, fake: FakeAdb):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests d'intégration : le CLI est exécuté en sous-processus réel contre un
 faux binaire « adb » (script bash). On teste donc le vrai chemin
-shutil.which → subprocess.run → parsing de adb.py, sans aucun mock Python."""
+shutil.which -> subprocess.run -> parsing de adb.py, sans aucun mock Python."""
 import json
 import os
 import stat
@@ -37,6 +37,9 @@ case "$1" in
               printf 'package:org.user.app\n'
             fi
             ;;
+          path)
+            echo "package:/data/app/$4/base.apk"
+            ;;
           uninstall)
             echo "Success"
             ;;
@@ -46,6 +49,10 @@ case "$1" in
         echo "Success"
         ;;
     esac
+    ;;
+  pull)
+    mkdir -p "$3"
+    printf 'apk-content' > "$3/$(basename "$2")"
     ;;
 esac
 '''
@@ -63,7 +70,11 @@ class CliSubprocess(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        # nettoyage du backup éventuel créé par les tests
+        # nettoyage du backup et des APK éventuellement créés par les tests
+        base = os.path.join(ROOT, "backups", "123ABC")
+        if os.path.isdir(base):
+            import shutil
+            shutil.rmtree(base, ignore_errors=True)
         p = os.path.join(ROOT, "backups", "123ABC.json")
         if os.path.exists(p):
             os.remove(p)
@@ -102,7 +113,7 @@ class CliSubprocess(unittest.TestCase):
     def test_uninstall_recovery_roundtrip(self):
         code, out, err = self.run_cli("uninstall", "com.facebook.appmanager", "--yes")
         self.assertEqual(code, 0, err)
-        self.assertIn("✔ com.facebook.appmanager retiré", out)
+        self.assertIn("OK  com.facebook.appmanager retiré", out)
         self.assertIn("retrait(s) réussi", out)
         path = os.path.join(ROOT, "backups", "123ABC.json")
         with open(path, encoding="utf-8") as fh:
@@ -112,12 +123,24 @@ class CliSubprocess(unittest.TestCase):
 
         code, out, _ = self.run_cli("restore", "--yes")
         self.assertEqual(code, 0)
-        self.assertIn("✔ com.facebook.appmanager restauré", out)
+        self.assertIn("OK  com.facebook.appmanager restauré", out)
 
     def test_uninstall_forbidden_refused(self):
         code, _, err = self.run_cli("uninstall", "com.android.chrome")
         self.assertEqual(code, 2)
         self.assertIn("protégé", err)
+
+    def test_uninstall_with_apk_backup(self):
+        code, out, err = self.run_cli("uninstall", "com.facebook.appmanager",
+                                      "--backup-apks", "--yes")
+        self.assertEqual(code, 0, err + out)
+        apk = os.path.join(ROOT, "backups", "123ABC", "apks",
+                           "com.facebook.appmanager", "base.apk")
+        self.assertTrue(os.path.exists(apk), out)
+        with open(apk, encoding="utf-8") as fh:
+            self.assertEqual(fh.read(), "apk-content")
+        self.assertIn("APK sauvegardé : com.facebook.appmanager", out)
+        self.assertIn("OK  com.facebook.appmanager retiré", out)
 
     def test_scan_from_other_cwd(self):
         code, out, _ = self.run_cli("scan", "--risk", "safe", cwd=self._tmp.name)

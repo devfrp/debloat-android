@@ -65,6 +65,14 @@ class Adb:
         return cmd + list(args)
 
     def run(self, *args: str, timeout: float = 30, check: bool = False) -> str:
+        rc, out, err = self._run_full(*args, timeout=timeout)
+        text = out if out else err
+        if check and rc != 0:
+            raise AdbError(text or f"code de sortie {rc}")
+        return text
+
+    def _run_full(self, *args: str, timeout: float = 30) -> tuple[int, str, str]:
+        """stdout, stderr et code de sortie d'un appel adb."""
         extra: dict = {}
         if os.name == "nt" and hasattr(subprocess, "CREATE_NO_WINDOW"):
             extra["creationflags"] = subprocess.CREATE_NO_WINDOW
@@ -81,12 +89,7 @@ class Adb:
             ) from exc
         except subprocess.TimeoutExpired as exc:
             raise AdbError(f"adb {' '.join(args[:3])} … : délai dépassé ({timeout} s).") from exc
-        out = (proc.stdout or "").strip()
-        err = (proc.stderr or "").strip()
-        text = out if out else err
-        if check and proc.returncode != 0:
-            raise AdbError(text or f"code de sortie {proc.returncode}")
-        return text
+        return proc.returncode, (proc.stdout or ""), (proc.stderr or "")
 
     # --------------------------------------------------------------- lecture
 
@@ -137,6 +140,22 @@ class Adb:
         """Réinstalle une app système précédemment retirée par --user 0."""
         out = self.run("shell", "cmd", "package", "install-existing", package, timeout=60)
         return self._ok(out), out
+
+    def app_apk_paths(self, package: str) -> list[str]:
+        """Chemins des APK de l'app (plusieurs pour une app « split »)."""
+        out = self.run("shell", "pm", "path", package)
+        return [line[len("package:"):].strip()
+                for line in out.splitlines()
+                if line.startswith("package:")
+                and len(line) > len("package:")]
+
+    def pull_apk(self, remote: str, dest_dir: str) -> tuple[bool, str]:
+        """Copie un APK du téléphone vers dest_dir (sans root, fichiers lisibles)."""
+        try:
+            rc, out, err = self._run_full("pull", remote, dest_dir, timeout=180)
+        except AdbError as exc:
+            return False, str(exc)
+        return rc == 0, ((out or err) or "").strip()
 
     @staticmethod
     def _ok(out: str) -> bool:

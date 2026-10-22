@@ -41,6 +41,14 @@ def backup_path(serial: str, directory: str | None = None) -> str:
     return os.path.join(directory, f"{safe_filename(serial)}.json")
 
 
+def apks_dir(serial: str, directory: str | None = None) -> str:
+    """Dossier des APK sauvegardés : backups/<serial>/apks/ (créé si absent)."""
+    root = directory if directory is not None else BACKUP_DIR
+    path = os.path.join(root, safe_filename(serial), "apks")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
 def list_backup_files(directory: str | None = None) -> list[str]:
     directory = directory if directory is not None else BACKUP_DIR
     files = sorted(glob.glob(os.path.join(directory, "*.json")),
@@ -87,7 +95,7 @@ def append_backup(path: str, serial: str, device: str,
                 quarantined = _quarantine(path)
             except OSError as exc:
                 return False, f"backup illisible et quarantaine impossible : {exc}"
-            warnings.append(f"⚠️ backup précédent illisible → quarantaine : "
+            warnings.append(f"backup précédent illisible -> quarantaine : "
                             f"{os.path.basename(quarantined)}. Historique démarré à zéro.")
         else:
             data = loaded

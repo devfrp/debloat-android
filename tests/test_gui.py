@@ -112,7 +112,7 @@ class ScanAndViews(GuiBase):
         # aucun élément de la vue protégée n'est décochable
         for iid in rows:
             self.assertFalse(self.app.packages[iid].checkable())
-            self.assertEqual(self.app.tree.item(iid, "values")[0], "⛔")
+            self.assertEqual(self.app.tree.item(iid, "values")[0], "[!]")
 
     def test_user_view(self):
         self.app.view.set("user")
@@ -147,12 +147,12 @@ class CheckboxFlow(GuiBase):
         self.app.view.set("bloat")
         self.app.refresh_tree()
         # simule le clic : la méthode prend (x, y) ; on passe par l'identifiant
-        # déjà résolu → on appelle le cœur du toggle
+        # déjà résolu -> on appelle le cœur du toggle
         info = self.app.packages[pkg]
         info.checked = True
         self.app.refresh_tree()
         vals = list(self.app.tree.item(pkg, "values"))
-        self.assertEqual(vals[0], "☑")
+        self.assertEqual(vals[0], "[x]")
         self.assertIn("(1)", self.app.btn_uninstall.cget("text"))
         self.assertEqual(str(self.app.btn_uninstall.cget("state")), "normal")
 
@@ -262,7 +262,7 @@ class Uninstall(GuiBase):
         self.app.uninstall_selected()
         self.pump(40)
         self.assertIn("com.facebook.appmanager", self.app.packages)
-        self.assertIn("✖ com.facebook.appmanager", self.log_text())
+        self.assertIn("ÉCHEC  com.facebook.appmanager", self.log_text())
         self.assertFalse(os.path.exists(backup_mod.backup_path("123ABC", self._tmp.name)))
 
     def test_adb_error_handled(self):
@@ -282,6 +282,40 @@ class Uninstall(GuiBase):
         data = _load(path)
         hist = {h["package"]: h["type"] for h in data["history"]}
         self.assertEqual(hist["org.perso.app"], "user")
+
+    def test_apk_backup_proposal_accepted(self):
+        pkg = "com.facebook.appmanager"
+        self.app.packages[pkg].checked = True
+        with mock.patch.object(debloat_gui.messagebox, "askyesno",
+                               side_effect=[True, True]):
+            self.app.uninstall_selected()
+        self.pump(60)
+        apk = os.path.join(self._tmp.name, "123ABC", "apks", pkg, "base.apk")
+        self.assertTrue(os.path.exists(apk), self.log_text())
+        self.assertIn("APK sauvegardé", self.log_text())
+        self.assertIn(f"OK  {pkg} retiré", self.log_text())
+        self.assertIn(pkg, self.fake.pulled[0][0])
+
+    def test_apk_backup_proposal_declined(self):
+        pkg = "com.facebook.appmanager"
+        self.app.packages[pkg].checked = True
+        with mock.patch.object(debloat_gui.messagebox, "askyesno",
+                               side_effect=[True, False]):
+            self.app.uninstall_selected()
+        self.pump(50)
+        self.assertFalse(os.path.exists(os.path.join(self._tmp.name, "123ABC", "apks")))
+        self.assertIn(f"OK  {pkg} retiré", self.log_text())
+
+    def test_apk_backup_failure_still_uninstalls(self):
+        self.fake.fail_pull = True
+        pkg = "com.facebook.appmanager"
+        self.app.packages[pkg].checked = True
+        with mock.patch.object(debloat_gui.messagebox, "askyesno",
+                               side_effect=[True, True]):
+            self.app.uninstall_selected()
+        self.pump(50)
+        self.assertIn("Échec de la sauvegarde APK", self.log_text())
+        self.assertIn(f"OK  {pkg} retiré", self.log_text())
 
 
 class BackupRobustness(GuiBase):
