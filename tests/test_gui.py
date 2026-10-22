@@ -10,6 +10,7 @@ import unittest
 import unittest.mock as mock
 
 import tkinter as tk
+from tkinter import ttk
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
@@ -18,7 +19,20 @@ if ROOT not in sys.path:
 import bloat_db                     # noqa: E402
 import backup as backup_mod         # noqa: E402
 import debloat_gui                  # noqa: E402
+import language                     # noqa: E402
 from tests.helpers import FakeAdb, patch_adb  # noqa: E402
+
+
+def _find_button(widget: tk.Widget, text: str):
+    """Bouton ttk trouvé récursivement parmi les descendants (texte exact)."""
+    for child in widget.winfo_children():
+        if isinstance(child, ttk.Button) and child.cget("text") == text:
+            return child
+        found = _find_button(child, text)
+        if found is not None:
+            return found
+    return None
+
 def _load(path):
     with open(path, encoding="utf-8") as fh:
         return json.load(fh)
@@ -486,6 +500,59 @@ class Stress(GuiBase):
                         f"recherche trop lente : {elapsed_search:.2f}s")
         print(f"[stress] scan={elapsed_scan:.2f}s refresh={elapsed_refresh:.2f}s "
               f"search={elapsed_search:.2f}s — {len(iids)} lignes")
+
+
+class EnglishUi(GuiBase):
+    """Interface construite après un choix « English » au démarrage."""
+
+    def setUp(self):
+        language.set_lang("en")
+        self.addCleanup(language.set_lang, "fr")
+        super().setUp()
+
+    def test_english_chrome(self):
+        self.assertIn("Scan apps", self.app.btn_scan.cget("text"))
+        self.assertIn("Uninstall selection", self.app.btn_uninstall.cget("text"))
+        self.assertEqual(self.app.btn_help.cget("text"), "Help")
+        self.assertEqual(self.app.btn_backups.cget("text"), "Backup manager")
+        counts = self.app.lbl_counts.cget("text")
+        self.assertIn("Safes: 1", counts)
+        self.assertIn("Advanced: 1", counts)
+        self.assertIn("Protected (locked): 2", counts)
+
+    def test_english_scan_logs(self):
+        self.assertIn("Welcome!", self.log_text())
+        self.assertIn("Scan: 6 apps in total — 5 system, 1 user", self.log_text())
+
+    def test_english_tree_user_row(self):
+        self.app.view.set(debloat_gui.VIEW_ADV)
+        self.app.refresh_tree()
+        self.assertEqual(self.app.tree.item("org.perso.app", "values")[3],
+                         "user app")
+
+
+class LanguageDialog(GuiBase):
+    """Boîte de sélection de langue au démarrage."""
+
+    def test_selector_pick_english(self):
+        def click():
+            btn = _find_button(self._root, "English")
+            if btn:
+                btn.invoke()
+        self._root.after(80, click)
+        self.assertEqual(debloat_gui.ask_language(self._root), "en")
+
+    def test_selector_close_defaults_to_french(self):
+        toplevels = {"seen": False}
+
+        def close():
+            for w in self._root.winfo_children():
+                if isinstance(w, tk.Toplevel) and w.title() == "Langue / Language":
+                    toplevels["seen"] = True
+                    w.destroy()
+        self._root.after(80, close)
+        self.assertEqual(debloat_gui.ask_language(self._root), "fr")
+        self.assertTrue(toplevels["seen"])
 
 
 if __name__ == "__main__":

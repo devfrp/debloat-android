@@ -18,6 +18,8 @@ stdlib Python — zéro dépendance) et un **compagnon CLI**, avec les mêmes ga
   **bloqués volontairement** : impossible de les cocher.
 - Avant tout retrait, l'app **propose de sauvegarder les APK** de la sélection sur le PC
   (`backups/<serial>/apks/<paquet>/`, via `adb pull`).
+- Au démarrage, l'app demande une fois : **français ou anglais** — toute l'interface
+  et l'aide suivent la langue choisie.
 
 ## Démarrage rapide
 
@@ -40,6 +42,22 @@ stdlib Python — zéro dépendance) et un **compagnon CLI**, avec les mêmes ga
    ```bash
    ./run.sh            # interface graphique : Rafraîchir -> Scan -> cocher -> Désinstaller
    ```
+
+## Téléchargements
+
+Des paquets préconstruits sont publiés sur la page
+[Releases GitHub](https://github.com/devfrp/debloat-android/releases) : chaque tag `v*`
+déclenche un workflow de build, publié uniquement sous le compte devfrp.
+
+| Plateforme | Fichier | Notes |
+|---|---|---|
+| Linux | `debloat-android-linux.AppImage` | se lance depuis le fichier, rien à installer |
+| Windows | `DebloatAndroid.exe` + `debloat-cli.exe` | exécutables autonomes |
+| macOS | `debloat-android-macos.zip` | décompresser puis lancer `DebloatAndroid.app` |
+
+Chaque paquet embarque la GUI (`pyinstaller --windowed`) ; le paquet Windows contient en
+plus le CLI. Les platform-tools ADB restent nécessaires (voir Démarrage rapide) et se
+déclarent via `ADB_PATH` s'ils ne sont pas dans le PATH.
 
 ## Interface graphique
 
@@ -136,6 +154,7 @@ l'utilisateur décide.
 ```
 debloat_gui.py   # interface Tkinter (vues, confirmations, sauvegarde APK, export, journal)
 debloat_cli.py   # CLI compagnon (devices / scan / uninstall / restore)
+language.py      # table de chaînes FR/EN + boîte de choix de langue au démarrage
 adb.py           # wrapper ADB (devices, getprop, pm list/uninstall, install-existing, pull)
 bloat_db.py      # base de bloat connue + composants protégés
 backup.py        # persistance backups/<serial>.json (atomicité, quarantaine, dossier APK)

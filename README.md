@@ -18,6 +18,8 @@ standard library — zero dependencies) and a **CLI companion**, with the same g
   **deliberately locked**: you cannot check them.
 - Before any removal, the tool **offers to save the APKs** of the selection to disk
   (`backups/<serial>/apks/<package>/`), pulled over `adb pull`.
+- At startup, the app asks once: **Français or English** — the whole interface and help
+  are then shown in the chosen language.
 
 ## Quick start
 
@@ -40,6 +42,21 @@ standard library — zero dependencies) and a **CLI companion**, with the same g
    ```bash
    ./run.sh            # GUI: Refresh -> Scan -> check -> Uninstall
    ```
+
+## Downloads
+
+Prebuilt packages are published on the [GitHub Releases](https://github.com/devfrp/debloat-android/releases)
+page: every tag `v*` triggers a build workflow, published under the devfrp account only.
+
+| Platform | File | Notes |
+|---|---|---|
+| Linux | `debloat-android-linux.AppImage` | runs from the file, nothing to install |
+| Windows | `DebloatAndroid.exe` + `debloat-cli.exe` | standalone executables |
+| macOS | `debloat-android-macos.zip` | unzip, then run `DebloatAndroid.app` |
+
+Each package builds in the GUI (`pyinstaller --windowed`); the Windows bundle also ships
+the CLI. The ADB platform-tools are still needed (see Quick start) and referenced with
+`ADB_PATH` when they are not in PATH.
 
 ## GUI workflow
 
@@ -134,6 +151,7 @@ A package missing from the database shows up as *unknown* — nothing breaks, th
 ```
 debloat_gui.py   # Tkinter GUI (views, confirmations, APK backup, export, log)
 debloat_cli.py   # CLI companion (devices / scan / uninstall / restore)
+language.py      # FR/EN string table + startup language dialog (ask_language)
 adb.py           # ADB wrapper (devices, getprop, pm list/uninstall, install-existing, pull)
 bloat_db.py      # known-bloat database + protected components
 backup.py        # backups/<serial>.json persistence (atomicity, quarantine, APK folder)

@@ -24,10 +24,11 @@ from tkinter import ttk, messagebox, filedialog
 
 import bloat_db
 import backup
+import language
 from adb import Adb, AdbError, DeviceInfo
 
 APP_TITLE = "Debloat Android"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.4.0"
 
 RISK_ORDER = {
     bloat_db.RISK_SAFE: 0,
@@ -39,28 +40,23 @@ RISK_ORDER = {
 # Deux modes seulement : « Sûr » (recommandées) et « Avancé » (prudence).
 # Les paquets hors base s'affichent comme avancées non listées ; les composants
 # protégés ne font pas partie des modes : masqués, retrouvables par la recherche.
-RISK_TEXT = {
-    bloat_db.RISK_SAFE: "sûre",
-    bloat_db.RISK_ADVANCED: "avancée",
-    bloat_db.RISK_UNKNOWN: "avancée (non listée)",
-    bloat_db.RISK_FORBIDDEN: "protégée (verrouillée)",
-}
-
 VIEW_SAFE = "safe"
 VIEW_ADV = "advanced"
 
 CHECK_ON, CHECK_OFF, CHECK_LOCK = "[x]", "[ ]", "[!]"
 
-HELP_TEXT = f"""\
+_HELP = {}
+
+_HELP["fr"] = f"""\
 DEBLOAT ANDROID — guide d'utilisation
 
 1) PRÉREQUIS
    • Installer l'outil ADB :
-       Debian/Ubuntu : sudo apt install adb
-       Fedora        : sudo dnf install android-tools
-       Arch          : sudo pacman -S android-tools
-       macOS         : brew install --cask android-platform-tools
-       Windows       : platform-tools (https://developer.android.com/studio/releases/platform-tools)
+        Debian/Ubuntu : sudo apt install adb
+        Fedora        : sudo dnf install android-tools
+        Arch          : sudo pacman -S android-tools
+        macOS         : brew install --cask android-platform-tools
+        Windows       : platform-tools (https://developer.android.com/studio/releases/platform-tools)
    • Si adb est installé ailleurs, lancez l'app avec :  ADB_PATH=/chemin/adb python3 debloat_gui.py
 
 2) ACTIVER LE MODE DÉBOGAGE SUR LE TÉLÉPHONE
@@ -72,37 +68,37 @@ DEBLOAT ANDROID — guide d'utilisation
 3) UTILISATION — DEUX MODES
    • «  Rafraîchir les appareils » : détecte le téléphone.
    • «  Scanner les applications » : classe les apps dans deux modes seulement :
-       Sûr    = retrait recommandé, sans danger attendu (mode sélectionné après scan),
-       Avancé = prudence — une fonctionnalité peut manquer après retrait. Les paquets
-                hors base s'y affichent comme « avancée (non listée) ».
-     Les composants protégés (Play services, IMS, téléphonie…) n'appartiennent
-     à aucun mode : ils sont masqués et toujours verrouillés au retrait. La
-     recherche permet de les retrouver (ligne verrouillée).
+        Sûr    = retrait recommandé, sans danger attendu (mode sélectionné après scan),
+        Avancé = prudence — une fonctionnalité peut manquer après retrait. Les paquets
+                 hors base s'y affichent comme « avancée (non listée) ».
+      Les composants protégés (Play services, IMS, téléphonie…) n'appartiennent
+      à aucun mode : ils sont masqués et toujours verrouillés au retrait. La
+      recherche permet de les retrouver (ligne verrouillée).
    • Le survol d'une ligne affiche une note explicative en bas de fenêtre.
    • Tu coches toi-même chaque app à retirer : un clic sur la ligne, ou Espace
-     sur la ligne sélectionnée (colonne « Cocher »). Le bouton « Cocher les
-     sûres (mode) » est un raccourci optionnel.
+      sur la ligne sélectionnée (colonne « Cocher »). Le bouton « Cocher les
+      sûres (mode) » est un raccourci optionnel.
    • « Désinstaller la sélection » applique le retrait :
-       mode Sûr    -> une seule confirmation,
-       mode Avancé -> deux confirmations,
-     et l'app propose de sauvegarder les APK de la sélection sur le PC.
-     Les apps utilisateur (Play Store) déclenchent en plus l'avertissement
-     de suppression définitive.
+        mode Sûr    -> une seule confirmation,
+        mode Avancé -> deux confirmations,
+      et l'app propose de sauvegarder les APK de la sélection sur le PC.
+      Les apps utilisateur (Play Store) déclenchent en plus l'avertissement
+      de suppression définitive.
    • « Rapport » : exporte le scan courant en fichier JSON archivable.
 
 4) CE QUE L'APP FAIT TECHNIQUEMENT
    • App système  : adb shell pm uninstall --user 0 <paquet>
-       -> retire l'app pour votre profil : l'APK reste sur le téléphone et tout
-         peut être restauré. C'est la méthode standard des outils de débloat.
+        -> retire l'app pour votre profil : l'APK reste sur le téléphone et tout
+          peut être restauré. C'est la méthode standard des outils de débloat.
    • App utilisateur (Play Store) : pm uninstall <paquet>
-       -> SUPPRESSION DÉFINITIVE, données perdues (réinstallez depuis une boutique).
+        -> SUPPRESSION DÉFINITIVE, données perdues (réinstallez depuis une boutique).
 
 5) RESTAURER
    • Chaque désinstallation est notée dans backups/<serial>.json.
    • « Gestionnaire de backups » -> choisir le fichier -> « Restaurer ce backup »
-     exécute : adb shell cmd package install-existing <paquet>.
+      exécute : adb shell cmd package install-existing <paquet>.
    • Un redémarrage du téléphone peut être utile après des restaurations de
-     services système.
+      services système.
 
 6) CONSEILS DE SÉCURITÉ
    • La première fois, désinstallez quelques apps à la fois et testez immédiatement.
@@ -111,21 +107,101 @@ DEBLOAT ANDROID — guide d'utilisation
      « debloat <paquet> » sur le web avant de le cocher.
    • Une mise à jour OTA du constructeur réinstalle généralement tout.
    • Un backup illisible est automatiquement mis en quarantaine (*.corrupt-…),
-     il n'est jamais écrasé : vérifiez le dossier backups/ si l'app le signale.
+      il n'est jamais écrasé : vérifiez le dossier backups/ si l'app le signale.
 
 7) COMPAGNON EN LIGNE DE COMMANDE (sans interface graphique)
    • python3 debloat_cli.py devices            -> appareils détectés
    • python3 debloat_cli.py scan               -> scan + classification (risques)
    • python3 debloat_cli.py scan --json        -> même données, en JSON réexportable
    • python3 debloat_cli.py uninstall <pkg…>   -> garde-fous identiques à la GUI
-       (--allow-unknown, --allow-user-apps, --yes, --dry-run)
+        (--allow-unknown, --allow-user-apps, --yes, --dry-run)
    • python3 debloat_cli.py restore            -> réinstalle le backup le plus récent
-       (--file backups/X.json, --yes, --dry-run)
+        (--file backups/X.json, --yes, --dry-run)
 
 ───
 Version {APP_VERSION} • Aucune donnée n'est envoyée sur Internet par cette app.
 En cas de souci, la restauration depuis le gestionnaire de backups est votre ami.
 """
+
+_HELP["en"] = f"""\
+DEBLOAT ANDROID — user guide
+
+1) REQUIREMENTS
+   • Install the ADB tool:
+        Debian/Ubuntu : sudo apt install adb
+        Fedora        : sudo dnf install android-tools
+        Arch          : sudo pacman -S android-tools
+        macOS         : brew install --cask android-platform-tools
+        Windows       : platform-tools (https://developer.android.com/studio/releases/platform-tools)
+   • If adb lives elsewhere, start the app with:  ADB_PATH=/path/to/adb python3 debloat_gui.py
+
+2) ENABLE DEBUGGING ON THE PHONE
+   • Settings -> About phone -> tap 7× on "build number".
+   • Developer options -> enable "USB debugging".
+   • Plug the USB cable, then accept the "Allow USB debugging" dialog on the
+     phone (check "Always allow").
+
+3) USAGE — TWO MODES
+   • "Refresh devices": detects the phone.
+   • "Scan apps": sorts apps into two modes only:
+        Safe     = removal recommended, expected to be harmless (mode selected after the scan),
+        Advanced = extra care — a feature may be missing after removal. Packages
+                   outside the database appear there as "advanced (unlisted)".
+     Protected components (Play services, IMS, telephony…) belong to no
+     mode: they are hidden and always locked from removal. The search
+     field retrieves them (locked row).
+   • Hovering a row shows an explanatory note at the bottom of the window.
+   • You check each app to remove yourself: a click on the row, or Space
+      on the selected row ("Check" column). The "Check safe ones (mode)"
+      button is an optional shortcut.
+   • "Uninstall selection" performs the removal:
+        Safe mode     -> a single confirmation,
+        Advanced mode -> two confirmations,
+      and the app offers to save the selection's APKs on the PC.
+      User apps (Play Store) additionally trigger the permanent-deletion
+      warning.
+   • "Report": exports the current scan as an archivable JSON file.
+
+4) WHAT THE APP DOES TECHNICALLY
+   • System app  : adb shell pm uninstall --user 0 <package>
+        -> removes the app for your profile: the APK stays on the phone and
+          everything can be restored. This is the standard debloat method.
+   • User app (Play Store) : pm uninstall <package>
+        -> PERMANENT DELETION, data lost (reinstall from a store).
+
+5) RESTORE
+   • Every uninstall is recorded in backups/<serial>.json.
+   • "Backup manager" -> pick the file -> "Restore this backup"
+      runs: adb shell cmd package install-existing <package>.
+   • A phone reboot may help after restoring system services.
+
+6) SAFETY TIPS
+   • The first time, remove a few apps at a time and test right away.
+   • Never force protected components (Play services, WebView, keyboard, launcher…).
+   • If unsure about an "advanced (unlisted)" package, search
+     "debloat <package>" on the web before checking it.
+   • An OTA update from the vendor usually reinstalls everything.
+   • An unreadable backup is automatically quarantined (*.corrupt-…);
+      it is never overwritten: check the backups/ folder if the app warns about it.
+
+7) COMMAND-LINE COMPANION (no GUI)
+   • python3 debloat_cli.py devices            -> detected devices
+   • python3 debloat_cli.py scan               -> scan + classification (risks)
+   • python3 debloat_cli.py scan --json        -> same data, re-exportable as JSON
+   • python3 debloat_cli.py uninstall <pkg…>   -> same guard rails as the GUI
+        (--allow-unknown, --allow-user-apps, --yes, --dry-run)
+   • python3 debloat_cli.py restore            -> reinstalls the newest backup
+        (--file backups/X.json, --yes, --dry-run)
+
+───
+Version {APP_VERSION} • This app sends nothing over the Internet.
+If anything goes wrong, restoring from the backup manager is your friend.
+"""
+
+
+def help_text() -> str:
+    """Texte d'aide dans la langue choisie au démarrage."""
+    return _HELP.get(language.get_lang()) or _HELP["fr"]
 
 
 @dataclass
@@ -166,8 +242,7 @@ class DebloatApp:
         self._build_ui()
         self._after_id = self.root.after(120, self._poll)
         self._set_default_status()
-        self.log("Bienvenue ! Branche ton téléphone (debogage USB active), puis clique « Rafraîchir les appareils ».\n"
-                 "Rien n'est coché d'office : coche chaque app que tu veux retirer, puis « Désinstaller la sélection ».")
+        self.log(language.t("welcome"))
         self.refresh_devices()
 
     # ------------------------------------------------------------------ UI
@@ -178,14 +253,14 @@ class DebloatApp:
         # ---------------------------------------------------------- header
         head = ttk.Frame(root)
         head.pack(fill="x", padx=10, pady=(10, 4))
-        self.lbl_dev = ttk.Label(head, text="Aucun appareil", font=("", 11, "bold"))
+        self.lbl_dev = ttk.Label(head, text=language.t("device.none"), font=("", 11, "bold"))
         self.lbl_dev.pack(side="left")
-        self.btn_help = ttk.Button(head, text="Aide", command=self.show_help)
+        self.btn_help = ttk.Button(head, text=language.t("btn.help"), command=self.show_help)
         self.btn_help.pack(side="right")
-        self.btn_scan = ttk.Button(head, text="Scanner les applications",
+        self.btn_scan = ttk.Button(head, text=language.t("btn.scan"),
                                    command=self.scan_packages, state="disabled")
         self.btn_scan.pack(side="right", padx=6)
-        self.btn_refresh = ttk.Button(head, text="Rafraîchir les appareils",
+        self.btn_refresh = ttk.Button(head, text=language.t("btn.refresh"),
                                       command=self.refresh_devices)
         self.btn_refresh.pack(side="right", padx=6)
 
@@ -195,45 +270,45 @@ class DebloatApp:
 
         left = ttk.Frame(body, width=235)
         left.pack(side="left", fill="y", padx=(0, 8))
-        ttk.Label(left, text="Mode", font=("", 10, "bold")).pack(anchor="w", pady=(0, 2))
+        ttk.Label(left, text=language.t("mode.header"), font=("", 10, "bold")).pack(anchor="w", pady=(0, 2))
         for value, text in (
-            (VIEW_SAFE, "Sûr — recommandées"),
-            (VIEW_ADV, "Avancé — prudence"),
+            (VIEW_SAFE, language.t("mode.safe")),
+            (VIEW_ADV, language.t("mode.adv")),
         ):
             ttk.Radiobutton(left, text=text, value=value, variable=self.view,
                             command=self.refresh_tree).pack(anchor="w", pady=1)
         self.lbl_counts = ttk.Label(left, text="", foreground="#55606e", justify="left")
         self.lbl_counts.pack(anchor="w", pady=(8, 4))
 
-        self.btn_sel_safe = ttk.Button(left, text="Cocher les sûres (mode)",
+        self.btn_sel_safe = ttk.Button(left, text=language.t("btn.check_safe"),
                                        command=lambda: self.select_all(True))
-        self.btn_sel_all = ttk.Button(left, text="Tout cocher (mode)",
+        self.btn_sel_all = ttk.Button(left, text=language.t("btn.check_all"),
                                       command=lambda: self.select_all(False))
-        self.btn_unsel = ttk.Button(left, text="Décocher tout", command=self.clear_checks)
+        self.btn_unsel = ttk.Button(left, text=language.t("btn.uncheck"), command=self.clear_checks)
         self.btn_sel_safe.pack(fill="x", pady=(6, 2))
         self.btn_sel_all.pack(fill="x", pady=2)
         self.btn_unsel.pack(fill="x", pady=2)
-        ttk.Label(left, text="Le mode « Avancé » demande\ndes confirmations supplémentaires.",
+        ttk.Label(left, text=language.t("hint.adv"),
                   foreground="#a25c00", justify="left").pack(anchor="w", pady=(10, 0))
 
         right = ttk.Frame(body)
         right.pack(side="left", fill="both", expand=True)
         srow = ttk.Frame(right)
         srow.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
-        ttk.Label(srow, text="Recherche :").pack(side="left")
+        ttk.Label(srow, text=language.t("search.hint")).pack(side="left")
         ttk.Entry(srow, textvariable=self.search).pack(side="left", fill="x", expand=True, padx=6)
         self.search.trace_add("write", lambda *_: self.refresh_tree())
 
         cols = ("check", "package", "app", "risk", "type")
         self.tree = ttk.Treeview(right, columns=cols, show="headings", selectmode="browse")
-        for col, text, width, anchor in (
-            ("check", "Cocher", 64, "center"),
-            ("package", "Paquet", 390, "w"),
-            ("app", "Application", 210, "w"),
-            ("risk", "Risque", 130, "w"),
-            ("type", "Type", 90, "w"),
+        for col, width, anchor, key in (
+            ("check", 64, "center", "col.check"),
+            ("package", 390, "w", "col.package"),
+            ("app", 210, "w", "col.app"),
+            ("risk", 130, "w", "col.risk"),
+            ("type", 90, "w", "col.type"),
         ):
-            self.tree.heading(col, text=text)
+            self.tree.heading(col, text=language.t(key))
             self.tree.column(col, width=width, anchor=anchor,
                              stretch=col in ("package", "app"))
         ysb = ttk.Scrollbar(right, orient="vertical", command=self.tree.yview)
@@ -264,16 +339,16 @@ class DebloatApp:
         actions.pack(fill="x", padx=10, pady=4)
         self.progress = ttk.Progressbar(actions, mode="determinate", length=280)
         self.progress.pack(side="left")
-        self.btn_uninstall = ttk.Button(actions, text="Désinstaller la sélection (0)",
+        self.btn_uninstall = ttk.Button(actions, text=language.t("btn.uninstall", n=0),
                                         command=self.uninstall_selected, state="disabled")
         self.btn_uninstall.pack(side="right")
-        self.btn_backups = ttk.Button(actions, text="Gestionnaire de backups",
+        self.btn_backups = ttk.Button(actions, text=language.t("btn.backups"),
                                       command=self.open_backups)
         self.btn_backups.pack(side="right", padx=6)
-        self.btn_export = ttk.Button(actions, text="Rapport", command=self.export_report)
+        self.btn_export = ttk.Button(actions, text=language.t("btn.report"), command=self.export_report)
         self.btn_export.pack(side="right", padx=6)
 
-        log_frame = ttk.LabelFrame(root, text="Journal")
+        log_frame = ttk.LabelFrame(root, text=language.t("log.cluster"))
         log_frame.pack(fill="x", padx=10, pady=(4, 4))
         self.txt_log = tk.Text(log_frame, height=9, state="disabled", wrap="none",
                                bg="#15181d", fg="#d7dde5",
@@ -302,14 +377,13 @@ class DebloatApp:
 
     def _set_default_status(self) -> None:
         if not self.serial:
-            self.lbl_status.config(text="Connecte un téléphone (débogage USB activé), puis « Rafraîchir les appareils ».")
+            self.lbl_status.config(text=language.t("status.no_device"))
             return
         if self.busy:
             return
         n = sum(1 for info in self.packages.values() if info.checked)
         self.lbl_status.config(
-            text=f"{len(self.packages)} apps chargées — sélection : {n} — "
-                 "un clic sur une ligne coche/décoche, survol = note, double-clic = détails.")
+            text=language.t("status.loaded", n=len(self.packages), sel=n))
 
     def _spawn(self, fn, *args) -> None:
         threading.Thread(target=fn, args=args, daemon=True).start()
@@ -363,15 +437,14 @@ class DebloatApp:
                 elif kind == "uninstall_done":
                     self._set_busy(False)
                     if msg[1]:
-                        self.log(f"Terminé : {msg[1]} désinstallation(s) réussie(s). "
-                                 "Les apps système restent restaurables via le gestionnaire de backups.", "ok")
+                        self.log(language.t("uninstall.done.ok", n=msg[1]), "ok")
                     else:
-                        self.log("Terminé : aucune désinstallation réussie — détail dans le journal.", "warn")
+                        self.log(language.t("uninstall.done.zero"), "warn")
                 elif kind == "restore_done":
                     self._set_busy(False)
-                    self.log("Restauration terminée.", "ok")
+                    self.log(language.t("restore.done_log"), "ok")
                     if msg[1] == self.serial:
-                        self.log("Nouveau scan pour mettre la liste à jour…")
+                        self.log(language.t("restore.rescan_log"))
                         self.scan_packages()
         except queue.Empty:
             pass
@@ -391,7 +464,7 @@ class DebloatApp:
         self.stop_polling()
         if self.busy:
             if not messagebox.askyesno(APP_TITLE,
-                                       "Une opération est en cours — quitter quand même ?"):
+                                       language.t("close.busy")):
                 return
         self.root.destroy()
 
@@ -401,7 +474,7 @@ class DebloatApp:
         if self.busy:
             return
         self.btn_refresh.config(state="disabled")
-        self.lbl_dev.config(text="Recherche des appareils…")
+        self.lbl_dev.config(text=language.t("device.searching"))
         self._spawn(self._th_refresh_devices)
 
     def _th_refresh_devices(self) -> None:
@@ -415,17 +488,16 @@ class DebloatApp:
     def _handle_devices(self, devices: list[DeviceInfo]) -> None:
         self.btn_refresh.config(state="normal" if not self.busy else "disabled")
         if not devices:
-            self.lbl_dev.config(text="Aucun appareil détecté")
-            self.log("Aucun appareil ADB. Vérifie : câble, « Débogage USB » dans les options pour développeurs, "
-                     "autorisation sur le téléphone (bouton Aide).", "warn")
+            self.lbl_dev.config(text=language.t("device.none.detected"))
+            self.log(language.t("device.none.log"), "warn")
             self._set_default_status()
             return
         for dev in devices:
             if dev.state != "device":
-                self.log(f"{dev.serial} : état « {dev.state} » — autorise le débogage USB sur le téléphone.", "warn")
+                self.log(language.t("device.state.warn", serial=dev.serial, state=dev.state), "warn")
         usable = [d for d in devices if d.state == "device"]
         if not usable:
-            self.lbl_dev.config(text="Appareil détecté mais non autorisé")
+            self.lbl_dev.config(text=language.t("device.unauthorized"))
             return
         serial = usable[0].serial if len(usable) == 1 else self._ask_device(usable)
         if serial:
@@ -433,10 +505,10 @@ class DebloatApp:
 
     def _ask_device(self, devices: list[DeviceInfo]) -> str | None:
         win = tk.Toplevel(self.root)
-        win.title("Choisir un appareil")
+        win.title(language.t("device.choose.title"))
         win.transient(self.root)
         win.grab_set()
-        ttk.Label(win, text="Plusieurs appareils sont détectés :").pack(padx=12, pady=(12, 6))
+        ttk.Label(win, text=language.t("device.choose.lead")).pack(padx=12, pady=(12, 6))
         lb = tk.Listbox(win, width=64, height=min(8, len(devices)))
         for dev in devices:
             lb.insert("end", f"{dev.serial} — {dev.model or '?'}")
@@ -451,7 +523,7 @@ class DebloatApp:
             win.destroy()
 
         lb.bind("<Double-1>", _ok)
-        ttk.Button(win, text="Continuer", command=_ok).pack(pady=(4, 12))
+        ttk.Button(win, text=language.t("common.continue_btn"), command=_ok).pack(pady=(4, 12))
         win.wait_window()
         return result["serial"]
 
@@ -460,7 +532,7 @@ class DebloatApp:
         self.serial = serial
         self.dev_label = (dev.model if dev and dev.model else "") or serial
         self.lbl_dev.config(text=f"{self.dev_label} ({serial})")
-        self.log(f"Appareil sélectionné : {self.dev_label} — scan des applications... ", "ok")
+        self.log(language.t("device.selected.log", dev=self.dev_label), "ok")
         self.scan_packages()
 
     # -------------------------------------------------------------- scan
@@ -471,7 +543,7 @@ class DebloatApp:
         self._set_busy(True)
         self.progress.config(mode="indeterminate")
         self.progress.start(12)
-        self.q.put(("status", "Scan des applications en cours…"))
+        self.q.put(("status", language.t("status.scanning")))
         self._spawn(self._th_scan, self.serial)
 
     def _th_scan(self, serial: str) -> None:
@@ -481,10 +553,10 @@ class DebloatApp:
             sys_pkgs = adb.system_packages()
             usr_pkgs = adb.user_packages()
         except AdbError as exc:
-            self.q.put(("scan_err", f"Scan échoué : {exc}"))
+            self.q.put(("scan_err", language.t("scan.err", err=exc)))
             return
         if not sys_pkgs and not usr_pkgs:
-            self.q.put(("scan_err", "Réponse vide — l'appareil a peut-être été débranché."))
+            self.q.put(("scan_err", language.t("scan.empty")))
             return
         pkgs: dict[str, PackageInfo] = {}
         for pkg in sys_pkgs:
@@ -497,7 +569,7 @@ class DebloatApp:
                 continue
             pkgs[pkg] = PackageInfo(
                 pkg, "user", bloat_db.RISK_UNKNOWN, "",
-                "App installée après l'achat (Play Store…). Sa désinstallation est définitive.")
+                language.t("note.user_app"))
         self.q.put(("scan_ok", props, pkgs))
 
     def _apply_scan(self, props: dict[str, str], pkgs: dict[str, PackageInfo]) -> None:
@@ -514,16 +586,18 @@ class DebloatApp:
 
         counts = Counter((info.ptype, info.risk) for info in self.packages.values())
         n_system = sum(counts[("system", r)] for r in RISK_ORDER)
-        self.log(f"Scan : {len(pkgs)} apps au total — {n_system} système, "
-                 f"{counts[('user', bloat_db.RISK_UNKNOWN)]} utilisateur", "ok")
-        self.log(f"   mode Sûr : {counts[('system', bloat_db.RISK_SAFE)]} • "
-                 f"mode Avancé : {counts[('system', bloat_db.RISK_ADVANCED)] + counts[('system', bloat_db.RISK_UNKNOWN)]} "
-                 f"(dont {counts[('system', bloat_db.RISK_UNKNOWN)]} non listée(s)) — "
-                 f"protégées masquées : {counts[('system', bloat_db.RISK_FORBIDDEN)]}")
+        self.log(language.t("scan.log.total", total=len(pkgs), nsys=n_system,
+                            nuser=counts[("user", bloat_db.RISK_UNKNOWN)]), "ok")
+        self.log(language.t(
+            "scan.log.modes",
+            safe=counts[("system", bloat_db.RISK_SAFE)],
+            adv=counts[("system", bloat_db.RISK_ADVANCED)]
+                + counts[("system", bloat_db.RISK_UNKNOWN)],
+            unlisted=counts[("system", bloat_db.RISK_UNKNOWN)],
+            prot=counts[("system", bloat_db.RISK_FORBIDDEN)]))
         self.view.set(VIEW_SAFE)
         self.refresh_tree()
-        self.q.put(("status", f"Scan fini — {len(pkgs)} apps. "
-                            "Coche chaque app à retirer (clic sur la ligne), puis « Désinstaller »."))
+        self.q.put(("status", language.t("status.scan_done", total=len(pkgs))))
 
     # ------------------------------------------------------------- tree
 
@@ -570,13 +644,13 @@ class DebloatApp:
             else:
                 icon = CHECK_ON if info.checked else CHECK_OFF
             if info.ptype == "system":
-                risk_txt = RISK_TEXT.get(info.risk, info.risk)
+                risk_txt = language.risk_text(info.risk)
                 tag = f"risk_{info.risk}"
-                type_txt = "système"
+                type_txt = language.t("type.system")
             else:
-                risk_txt = "app utilisateur"
+                risk_txt = language.t("hover.risk_user")
                 tag = "risk_user"
-                type_txt = "utilisateur"
+                type_txt = language.t("type.user")
             tree.insert("", "end", iid=pkg, values=(icon, info.package, info.label,
                                                     risk_txt, type_txt), tags=(tag,))
         self._update_counts()
@@ -588,8 +662,9 @@ class DebloatApp:
         if info is None:
             return
         if not info.checkable():
-            self.log(f"Refusé : {info.package} est un composant protégé ({info.label or 'vital pour le système'}) — "
-                     "l'app bloque volontairement sa désinstallation.", "warn")
+            self.log(language.t("toggle.refused",
+                                pkg=info.package,
+                                label=info.label or language.t("protected.fallback")), "warn")
             return
         if self.busy:
             return
@@ -617,14 +692,16 @@ class DebloatApp:
         info = self.packages.get(iid)
         if info is None:
             return
-        head = info.label or "Application"
-        msg = (f"Paquet : {info.package}\n"
-               f"Type : {'app système' if info.ptype == 'system' else 'app utilisateur (Play Store…)'}\n"
-               f"Risque : {RISK_TEXT.get(info.risk, info.risk)}\n\n")
+        head = info.label or language.t("details.app_head")
+        msg = (language.t("details.package", pkg=info.package) + "\n"
+               + language.t("details.type", type=language.t(
+                   "details.type.system" if info.ptype == "system"
+                   else "details.type.user")) + "\n"
+               + language.t("details.risk_header",
+                            risk=language.risk_text(info.risk)) + "\n\n")
         if info.risk == bloat_db.RISK_FORBIDDEN:
-            msg += "Composant protégé — l'app bloque volontairement sa désinstallation.\n\n"
-        msg += info.note or "Pas de note particulière. En cas de doute, cherche « debloat " \
-                            + info.package + " » sur le web."
+            msg += language.t("details.protected_extra")
+        msg += info.note or language.t("details.no_note", pkg=info.package)
         messagebox.showinfo(head, msg, parent=self.root)
 
     def _on_tree_hover(self, event) -> None:
@@ -633,8 +710,8 @@ class DebloatApp:
         iid = self.tree.identify_row(event.y)
         info = self.packages.get(iid)
         if info:
-            risk = (RISK_TEXT.get(info.risk, info.risk)
-                    if info.ptype == "system" else "app utilisateur")
+            risk = (language.risk_text(info.risk)
+                    if info.ptype == "system" else language.t("hover.risk_user"))
             text = f"{info.package} — {info.label or '?'} [{risk}]"
             if info.note:
                 text += f" — {info.note}"
@@ -658,12 +735,11 @@ class DebloatApp:
                     touched_unlisted = True
         if changed:
             self.refresh_tree()
-            self.log(f"{changed} app(s) cochée(s) (mode « {self.view.get()} »).")
+            self.log(language.t("select.log.done", n=changed, mode=self.view.get()))
             if touched_unlisted:
-                self.log("La sélection contient des paquets non répertoriés — "
-                         "vérifie un par un.", "warn")
+                self.log(language.t("select.log.unlisted"), "warn")
         else:
-            self.log("Rien de nouveau à cocher dans le mode courant.")
+            self.log(language.t("select.log.nothing"))
 
     def clear_checks(self) -> None:
         if self.busy:
@@ -677,16 +753,17 @@ class DebloatApp:
     def _update_counts(self) -> None:
         c = Counter((info.ptype, info.risk) for info in self.packages.values())
         self.lbl_counts.config(
-            text=(f"Sûres : {c[('system', bloat_db.RISK_SAFE)]}\n"
-                  f"Avancées : {c[('system', bloat_db.RISK_ADVANCED)]} "
-                  f"(dont {c[('system', bloat_db.RISK_UNKNOWN)]} non listées)\n"
-                  f"Utilisateur : {c[('user', bloat_db.RISK_UNKNOWN)]}\n"
-                  f"Protégées (verrouillées) : {c[('system', bloat_db.RISK_FORBIDDEN)]}"))
+            text=language.t("lbl.counts",
+                            safe=c[("system", bloat_db.RISK_SAFE)],
+                            adv=c[("system", bloat_db.RISK_ADVANCED)],
+                            unlisted=c[("system", bloat_db.RISK_UNKNOWN)],
+                            user=c[("user", bloat_db.RISK_UNKNOWN)],
+                            prot=c[("system", bloat_db.RISK_FORBIDDEN)]))
 
     def _update_actionbar(self) -> None:
         n = sum(1 for info in self.packages.values() if info.checked)
         self.btn_uninstall.config(
-            text=f"Désinstaller la sélection ({n})",
+            text=language.t("btn.uninstall", n=n),
             state="disabled" if (self.busy or n == 0) else "normal")
 
     def uninstall_selected(self) -> None:
@@ -695,14 +772,14 @@ class DebloatApp:
         targets = [pkg for pkg, info in sorted(self.packages.items())
                    if info.checked and info.checkable()]
         if not targets:
-            messagebox.showinfo(APP_TITLE, "Aucune app cochée.", parent=self.root)
+            messagebox.showinfo(APP_TITLE, language.t("confirm.none_checked"), parent=self.root)
             return
         if not self._confirm_uninstall(targets):
             return
         backup_apks = self._propose_apk_backup(targets)
         self._set_busy(True)
         self.progress.config(mode="determinate", maximum=len(targets), value=0)
-        self.q.put(("status", f"Désinstallation de {len(targets)} app(s)…"))
+        self.q.put(("status", language.t("status.uninstalling", n=len(targets))))
         self._spawn(self._th_uninstall, targets, backup_apks)
 
     def _propose_apk_backup(self, targets: list[str]) -> bool:
@@ -710,11 +787,8 @@ class DebloatApp:
         if not self.serial:
             return False
         return messagebox.askyesno(
-            "Sauvegarde avant retrait",
-            "Sauvegarder les APK de la sélection sur le PC avant de les retirer ?\n\n"
-            "Destination : backups/<serial>/apks/<paquet>/\n\n"
-            "Le journal de restauration (backups/<serial>.json) est, lui,\n"
-            "créé automatiquement de toute façon.",
+            language.t("confirm.backup.title"),
+            language.t("confirm.backup.body"),
             parent=self.root)
 
     def _confirm_uninstall(self, targets: list[str]) -> bool:
@@ -733,48 +807,36 @@ class DebloatApp:
                     n_unlisted += 1
         preview = "\n".join(f"  • {self.packages[p].package}" for p in targets[:12])
         if len(targets) > 12:
-            preview += f"\n  … et {len(targets) - 12} autre(s)"
+            preview += "\n  " + language.t("more.items", n=len(targets) - 12)
 
         if n_adv == 0 and n_user == 0:
-            text = (f"Retirer {len(targets)} app(s) « sûres » ?\n\n"
-                    f"{preview}\n\n"
-                    "Les apps système restent restaurables (gestionnaire de backups).\n"
-                    "Continuer ?")
-            return messagebox.askyesno("Mode Sûr — confirmation", text, parent=self.root)
+            text = language.t("confirm.safe.body", n=len(targets), preview=preview)
+            return messagebox.askyesno(language.t("confirm.safe.title"), text,
+                                       parent=self.root)
 
         if n_adv == 0 and n_user:
             # Sélection uniquement utilisateur : le garde-fou de suppression
             # définitive suffit (pas de mode Avancé impliqué).
             return messagebox.askyesno(
-                "Apps utilisateur — SUPPRESSION DÉFINITIVE",
-                f"{n_user} app(s) utilisateur seront définitivement supprimées\n"
-                "(données perdues — réinstallables seulement via une boutique).\n\n"
-                "Confirmer ?", parent=self.root, icon="warning")
+                language.t("confirm.user.title"),
+                language.t("confirm.user.body", n=n_user),
+                parent=self.root, icon="warning")
 
-        text = (f"MODE AVANCÉ — tu vas retirer {len(targets)} app(s) :\n\n"
-                f" • {n_safe} sûre(s)\n"
-                f" • {n_adv} avancée(s) (dont {n_unlisted} non listée(s))\n"
-                f" • {n_user} utilisateur(s) — SUPPRESSION DÉFINITIVE\n\n"
-                f"{preview}\n\n"
-                "Une fonctionnalité peut manquer après le retrait (cloud, notes,\n"
-                "caméra, réseau…). Les apps système restent restaurables ;\n"
-                "les apps utilisateur, non.\n\n"
-                "Continuer ?")
-        if not messagebox.askyesno("Mode Avancé — confirmation 1/2", text,
+        text = language.t("confirm.adv.body1", n=len(targets), safe=n_safe,
+                          adv=n_adv, unlisted=n_unlisted, user=n_user,
+                          preview=preview)
+        if not messagebox.askyesno(language.t("confirm.adv.title1"), text,
                                    parent=self.root, icon="warning"):
             return False
         if not messagebox.askyesno(
-                "Mode Avancé — confirmation 2/2",
-                "Dernière vérification avant de retirer.\n\n"
-                "Relis les lignes au-dessus : ce retrait est-il vraiment voulu ?\n\n"
-                "Confirmer définitivement ?",
+                language.t("confirm.adv.title2"),
+                language.t("confirm.adv.body2"),
                 parent=self.root, icon="warning"):
             return False
         if n_user and not messagebox.askyesno(
-                "Apps utilisateur — SUPPRESSION DÉFINITIVE",
-                f"{n_user} app(s) utilisateur seront définitivement supprimées\n"
-                "(données perdues — réinstallables seulement via une boutique).\n\n"
-                "Confirmer ?", parent=self.root, icon="warning"):
+                language.t("confirm.user.title"),
+                language.t("confirm.user.body", n=n_user),
+                parent=self.root, icon="warning"):
             return False
         return True
 
@@ -790,29 +852,33 @@ class DebloatApp:
             try:
                 if info.ptype == "user":
                     ok, out = adb.uninstall_user_app(pkg)
-                    flavor = "app utilisateur"
+                    flavor = language.t("uninstall.flavor.user")
                 else:
                     ok, out = adb.uninstall_for_user0(pkg)
-                    flavor = "profil 0"
+                    flavor = language.t("uninstall.flavor.system")
             except AdbError as exc:
                 ok, out = False, str(exc)
             if ok:
                 ok_count += 1
-                self.q.put(("log", f"OK  {pkg} retiré ({flavor}).", "ok"))
+                self.q.put(("log", language.t("uninstall.ok_log", pkg=pkg,
+                                              flavor=flavor), "ok"))
                 self.q.put(("removed", pkg))
                 self._backup_pkg(pkg, info.ptype)
             else:
-                self.q.put(("log", f"ÉCHEC  {pkg} : {out or 'échec'}", "err"))
+                self.q.put(("log", language.t("uninstall.fail_log",
+                                              pkg=pkg,
+                                              out=out or language.t("fallback.failure")),
+                            "err"))
             self.q.put(("prog_step",))
         self.q.put(("uninstall_done", ok_count))
 
     def _save_apks(self, adb: Adb, targets: list[str]) -> None:
         """Copie les APK de la sélection vers backups/<serial>/apks/<paquet>/."""
-        self.q.put(("status", "Sauvegarde des APK de la sélection…"))
+        self.q.put(("status", language.t("status.saving_apks")))
         try:
             root = backup.apks_dir(self.serial)
         except OSError as exc:
-            self.q.put(("log", f"Impossible de créer le dossier des APK : {exc}", "err"))
+            self.q.put(("log", language.t("save_apks.mkdir_fail", err=exc), "err"))
             return
         for pkg in targets:
             info = self.packages.get(pkg)
@@ -821,16 +887,18 @@ class DebloatApp:
             try:
                 paths = adb.app_apk_paths(pkg)
             except AdbError as exc:
-                self.q.put(("log", f"APK non sauvegardé ({pkg}) : {exc}", "warn"))
+                self.q.put(("log", language.t("save_apks.not_pulled",
+                                              pkg=pkg, err=exc), "warn"))
                 continue
             if not paths:
-                self.q.put(("log", f"APK introuvable sur l'appareil ({pkg}).", "warn"))
+                self.q.put(("log", language.t("save_apks.missing", pkg=pkg), "warn"))
                 continue
             dest = os.path.join(root, pkg)
             try:
                 os.makedirs(dest, exist_ok=True)
             except OSError as exc:
-                self.q.put(("log", f"APK non sauvegardé ({pkg}) : {exc}", "warn"))
+                self.q.put(("log", language.t("save_apks.not_pulled",
+                                              pkg=pkg, err=exc), "warn"))
                 continue
             pulled = 0
             for remote in paths:
@@ -838,10 +906,11 @@ class DebloatApp:
                 if good:
                     pulled += 1
             if pulled:
-                self.q.put(("log", f"APK sauvegardé : {pkg} ({pulled} fichier(s) -> {dest})", "ok"))
+                self.q.put(("log", language.t("save_apks.saved", pkg=pkg,
+                                              n=pulled, dest=dest), "ok"))
             else:
-                self.q.put(("log", f"Échec de la sauvegarde APK ({pkg}).", "err"))
-        self.q.put(("status", f"Désinstallation de {len(targets)} app(s)…"))
+                self.q.put(("log", language.t("save_apks.all_failed", pkg=pkg), "err"))
+        self.q.put(("status", language.t("status.uninstalling", n=len(targets))))
 
     def _backup_pkg(self, pkg: str, ptype: str) -> None:
         if not self.serial:
@@ -853,7 +922,7 @@ class DebloatApp:
         if not ok:
             self.q.put(("log", message, "err"))
             return
-        self.q.put(("log", f"Backup mis à jour : {path}"))
+        self.q.put(("log", language.t("backup.updated_log", path=path)))
         if message:
             self.q.put(("log", message, "warn"))
 
@@ -866,15 +935,14 @@ class DebloatApp:
         files = backup.list_backup_files()
         if not files:
             messagebox.showinfo(
-                "Gestionnaire de backups",
-                "Aucun backup pour le moment.\nUn fichier backups/<serial>.json est créé\n"
-                "automatiquement à la première désinstallation.", parent=self.root)
+                language.t("backups.none.title"),
+                language.t("backups.none.body"), parent=self.root)
             return
         win = tk.Toplevel(self.root)
-        win.title("Gestionnaire de backups — restauration")
+        win.title(language.t("backups.win.title"))
         win.geometry("760x470")
         win.transient(self.root)
-        ttk.Label(win, text="Fichiers de backup :").pack(anchor="w", padx=10, pady=(10, 2))
+        ttk.Label(win, text=language.t("backups.files_label")).pack(anchor="w", padx=10, pady=(10, 2))
         lb_files = tk.Listbox(win, height=5)
         for path in files:
             lb_files.insert("end", os.path.basename(path))
@@ -895,10 +963,12 @@ class DebloatApp:
                     with open(path, encoding="utf-8") as fh:
                         data = json.load(fh)
                 except (OSError, json.JSONDecodeError) as exc:
-                    txt.insert("end", f"Impossible de lire ce backup : {exc}\n")
+                    txt.insert("end", language.t("backups.read_fail", err=exc) + "\n")
                 else:
-                    txt.insert("end", f"Appareil : {data.get('device') or '?'}\n")
-                    txt.insert("end", f"Serial  : {data.get('serial') or '?'}\n\n")
+                    txt.insert("end", language.t("backups.detail.device",
+                                                 dev=data.get("device") or "?") + "\n")
+                    txt.insert("end", language.t("backups.detail.serial",
+                                                 srl=data.get("serial") or "?") + "\n\n")
                     for h in data.get("history", []):
                         txt.insert("end", f"{h.get('date', '?')}  "
                                           f"{'sys ' if h.get('type') == 'system' else 'user'}  "
@@ -912,9 +982,8 @@ class DebloatApp:
                 return
             path = files[sel[0]]
             if not messagebox.askyesno(
-                    "Restaurer",
-                    "Réinstaller TOUTES les apps système de ce backup sur le téléphone\n"
-                    "(les apps utilisateur doivent être réinstallées à la main) ?",
+                    language.t("restore.confirm.title"),
+                    language.t("restore.confirm.body"),
                     parent=win):
                 return
             win.destroy()
@@ -923,7 +992,7 @@ class DebloatApp:
             self._spawn(self._th_restore, path)
 
         lb_files.bind("<<ListboxSelect>>", _show_details)
-        ttk.Button(win, text="Restaurer ce backup", command=_restore).pack(pady=8)
+        ttk.Button(win, text=language.t("btn.restore_this"), command=_restore).pack(pady=8)
         txt.pack(side="left", fill="both", expand=True, padx=(10, 0), pady=(6, 10))
         ysb.pack(side="right", fill="y", pady=(6, 10), padx=(0, 10))
         _show_details()
@@ -931,27 +1000,30 @@ class DebloatApp:
     def _th_restore(self, path: str) -> None:
         data, err = backup.read_backup(path)
         if data is None:
-            self.q.put(("log", f"Lecture du backup impossible : {err}", "err"))
+            self.q.put(("log", language.t("restore.read_fail", err=err), "err"))
             self.q.put(("restore_done", self.serial))
             return
         serial = data.get("serial") or self.serial
         adb = Adb(serial)
-        self.q.put(("log", f"Restauration de {os.path.basename(path)} sur {serial}…", "ok"))
+        self.q.put(("log", language.t("restore.start_log",
+                                      name=os.path.basename(path), serial=serial), "ok"))
         self.q.put(("prog_max", len(backup.entries(data))))
         for entry in backup.entries(data):
             pkg = entry.get("package") or ""
             if entry.get("type") == "user":
-                self.q.put(("log", f"{pkg} : app utilisateur — réinstalle-la à la main "
-                                   "(Play Store ou APK).", "warn"))
+                self.q.put(("log", language.t("restore.skip_user", pkg=pkg), "warn"))
                 continue
             try:
                 ok, out = adb.install_existing(pkg)
             except AdbError as exc:
                 ok, out = False, str(exc)
             if ok:
-                self.q.put(("log", f"OK  {pkg} restauré.", "ok"))
+                self.q.put(("log", language.t("restore.ok_log", pkg=pkg), "ok"))
             else:
-                self.q.put(("log", f"ÉCHEC  {pkg} : {out or 'échec'}", "err"))
+                self.q.put(("log", language.t("restore.fail_log",
+                                              pkg=pkg,
+                                              out=out or language.t("fallback.failure")),
+                            "err"))
             self.q.put(("prog_step",))
         self.q.put(("restore_done", serial))
 
@@ -960,17 +1032,18 @@ class DebloatApp:
     def export_report(self) -> None:
         if not self.serial or not self.packages:
             messagebox.showinfo(
-                "Exporter le rapport",
-                "Aucun scan à exporter.\nConnecte un appareil et fais « Scanner les applications ».",
+                language.t("export.none.title"),
+                language.t("export.none.body"),
                 parent=self.root)
             return
         stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         default_name = (f"scan_{backup.safe_filename(self.serial)}_{stamp}.json")
         path = filedialog.asksaveasfilename(
-            title="Exporter le rapport de scan",
+            title=language.t("export.dialog.title"),
             initialfile=default_name,
             defaultextension=".json",
-            filetypes=[("JSON", "*.json"), ("Tous les fichiers", "*")],
+            filetypes=[(language.t("export.filetypes.json"), "*.json"),
+                       (language.t("export.filetypes.all"), "*")],
             parent=self.root)
         if not path:
             return
@@ -1002,32 +1075,65 @@ class DebloatApp:
             with open(path, "w", encoding="utf-8") as fh:
                 json.dump(payload, fh, indent=1, ensure_ascii=False)
         except OSError as exc:
-            self.log(f"Écriture du rapport impossible : {exc}", "err")
+            self.log(language.t("export.write_fail", err=exc), "err")
             return
-        self.log(f"Rapport exporté : {path}", "ok")
+        self.log(language.t("export.ok_log", path=path), "ok")
 
     # ----------------------------------------------------------------- aide
 
     def show_help(self) -> None:
         win = tk.Toplevel(self.root)
-        win.title("Aide — Debloat Android")
+        win.title(language.t("help.title"))
         win.geometry("700x540")
         win.transient(self.root)
         txt = tk.Text(win, wrap="word", padx=14, pady=10, font=("TkDefaultFont", 10))
         ysb = ttk.Scrollbar(win, command=txt.yview)
         txt.configure(yscrollcommand=ysb.set)
-        txt.insert("1.0", HELP_TEXT)
+        txt.insert("1.0", help_text())
         txt.configure(state="disabled")
         txt.pack(side="left", fill="both", expand=True)
         ysb.pack(side="right", fill="y")
 
 
+def ask_language(root: "tk.Tk") -> str:
+    """Mini-fenêtre de choix de langue, avant la construction de l'interface.
+
+    Deux boutons : « Français » et « English ». Fermer la fenêtre (croix)
+    revient à rester en français (défaut).
+    """
+    win = tk.Toplevel(root)
+    win.title("Langue / Language")
+    win.geometry("400x180")
+    win.resizable(False, False)
+    win.transient(root)
+    chosen: dict[str, str] = {"lang": ""}
+
+    def _pick(code: str) -> None:
+        chosen["lang"] = code
+        win.destroy()
+
+    ttk.Label(win, text="Choisis ta langue / Choose your language:",
+              font=("", 11, "bold")).pack(pady=(20, 12))
+    row = ttk.Frame(win)
+    row.pack()
+    ttk.Button(row, text="Français", width=16,
+               command=lambda: _pick("fr")).pack(side="left", padx=8)
+    ttk.Button(row, text="English", width=16,
+               command=lambda: _pick("en")).pack(side="left", padx=8)
+    win.protocol("WM_DELETE_WINDOW", lambda: _pick("fr"))
+    root.wait_window(win)
+    return chosen["lang"] or "fr"
+
+
 def main() -> None:
     root = tk.Tk()
+    root.withdraw()
     try:
         ttk.Style().theme_use("clam")
     except tk.TclError:
         pass
+    language.set_lang(ask_language(root))
+    root.deiconify()
     DebloatApp(root)
     root.mainloop()
 
