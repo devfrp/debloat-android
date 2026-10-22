@@ -1,0 +1,141 @@
+# Build multi-plateforme + publication des paquets sur la GitHub Release du depot.
+# Declencheurs : lancement manuel (workflow_dispatch) et pousse de tags v*.
+name: build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pre-requis (Tk pour PyInstaller)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3-tk
+
+      - name: PyInstaller (GUI, un seul binaire)
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pyinstaller
+          pyinstaller --onefile --windowed --name debloat-android debloat_gui.py
+
+      - name: Assembler l'AppDir
+        run: |
+          APPDIR=build/AppDir
+          mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications"
+          install -m 0755 dist/debloat-android "$APPDIR/usr/bin/debloat-android"
+          cat > "$APPDIR/usr/share/applications/debloat-android.desktop" <<'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Debloat Android
+Comment=Retrait des apps systeme d'un smartphone Android, via ADB (sans root)
+Exec=AppRun
+Icon=debloat-android
+Categories=Utility;Development;
+DESKTOP
+          cp "$APPDIR/usr/share/applications/debloat-android.desktop" "$APPDIR/debloat-android.desktop"
+          cat > "$APPDIR/AppRun" <<'RUN'
+#!/bin/sh
+HERE="$(dirname "$(readlink -f "$0")")"
+exec "$HERE/usr/bin/debloat-android" "$@"
+RUN
+          chmod 0755 "$APPDIR/AppRun"
+
+      - name: appimagetool -> .AppImage
+        run: |
+          cd build
+          curl -fsSL -o appimagetool-x86_64.AppImage \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod 0755 appimagetool-x86_64.AppImage
+          export APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64
+          ./appimagetool-x86_64.AppImage AppDir debloat-android-linux.AppImage
+          test -f debloat-android-linux.AppImage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: build/debloat-android-linux.AppImage
+          if-no-files-found: error
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PyInstaller (GUI + CLI)
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller
+          pyinstaller --onefile --windowed --name DebloatAndroid debloat_gui.py
+          pyinstaller --onefile --name debloat-cli debloat_cli.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/DebloatAndroid.exe
+            dist/debloat-cli.exe
+          if-no-files-found: error
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PyInstaller (.app)
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pyinstaller
+          pyinstaller --windowed --name DebloatAndroid debloat_gui.py
+
+      - name: Archiver le .app
+        run: |
+          ditto -c -k --keepParent dist/DebloatAndroid.app dist/debloat-android-macos.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/debloat-android-macos.zip
+          if-no-files-found: error
+
+  publish-release:
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Telecharger tous les artefacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Publier la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth status
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            TAG="$GITHUB_REF_NAME"
+          else
+            TAG="manual-$(date -u +%Y%m%d-%H%M%S)"
+          fi
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Debloat Android $TAG" \
+            --notes "Paquets multi-plateformes .
+
+- Linux : debloat-android-linux.AppImage (GUI)
+- Windows : DebloatAndroid.exe (GUI) + debloat-cli.exe (CLI)
+- macOS : debloat-android-macos.zip (GUI, .app non signe)
+
+Les platform-tools ADB sont requis sur la machine hote." \
+            debloat-android-linux.AppImage DebloatAndroid.exe debloat-cli.exe debloat-android-macos.zip
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY"
