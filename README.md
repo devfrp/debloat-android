@@ -34,11 +34,14 @@ stdlib Python — zéro dépendance) et un **compagnon CLI**, avec les mêmes ga
 
 ## Interface graphique
 
-**🔄 Rafraîchir les appareils → 🔍 Scanner les applications → cocher → 🗑️ Désinstaller la sélection.**
+**🔄 Rafraîchir les appareils → 🔍 Scanner les applications → coche chaque app à retirer → 🗑️ Désinstaller la sélection.**
+
+Rien n'est coché d'office : **c'est toi qui coche explicitement** chaque app (un clic sur la ligne,
+ou Espace sur la ligne sélectionnée). Le bouton « ✅ Cocher les sûrs (vue) » reste un raccourci optionnel.
 
 | Icône | Signification | Comportement |
 |---|---|---|
-| ✅ | bloat sûr (`safe`) | pré-cochée après le scan |
+| ✅ | bloat sûr (`safe`) | à cocher toi-même (aucune coche automatique) |
 | 🟠 | avancé (`advanced`) | décochée, confirmation douce |
 | ❔ | inconnu (hors base) | décochée, double confirmation |
 | ⛔ | protégé | non décochable, par précaution : Play services, WebView, clavier, lanceur… |

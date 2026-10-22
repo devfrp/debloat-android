@@ -89,7 +89,9 @@ class ScanAndViews(GuiBase):
         self.assertEqual(set(self.app.packages), set(FAKE_SYS + FAKE_USER))
         info = self.app.packages["com.facebook.appmanager"]
         self.assertEqual(info.risk, bloat_db.RISK_SAFE)
-        self.assertTrue(info.checked)
+        # aucune coche automatique : c'est l'utilisateur qui coche explicitement
+        self.assertFalse(info.checked)
+        self.assertFalse(any(i.checked for i in self.app.packages.values()))
         self.assertFalse(self.app.packages["com.netflix.mediaclient"].checked)
         self.assertFalse(self.app.packages["com.google.android.gms"].checkable())
         header = self.app.lbl_dev.cget("text")
@@ -151,8 +153,7 @@ class CheckboxFlow(GuiBase):
         self.app.refresh_tree()
         vals = list(self.app.tree.item(pkg, "values"))
         self.assertEqual(vals[0], "☑")
-        # l'app sûre est déjà cochée par le scan → la coche ajoutée fait 2
-        self.assertIn("(2)", self.app.btn_uninstall.cget("text"))
+        self.assertIn("(1)", self.app.btn_uninstall.cget("text"))
         self.assertEqual(str(self.app.btn_uninstall.cget("state")), "normal")
 
     def test_forbidden_log_on_toggle_attempt(self):
@@ -166,6 +167,18 @@ class CheckboxFlow(GuiBase):
             self.app._on_tree_click(evt)
         self.assertFalse(self.app.packages[pkg].checked)
         self.assertIn("composant protégé", self.log_text())
+
+    def test_space_toggles_selected_row(self):
+        pkg = "com.netflix.mediaclient"
+        self.app.view.set("bloat")
+        self.app.refresh_tree()
+        self.app.tree.selection_set(pkg)
+        self.assertFalse(self.app.packages[pkg].checked)
+        self.app._on_space(mock.Mock())
+        self.assertTrue(self.app.packages[pkg].checked)
+        self.assertIn("(1)", self.app.btn_uninstall.cget("text"))
+        self.app._on_space(mock.Mock())
+        self.assertFalse(self.app.packages[pkg].checked)
 
     def test_select_all_safe_only(self):
         self.app.view.set("bloat")
@@ -326,7 +339,7 @@ class ExportReport(GuiBase):
         self.assertEqual(apps["com.facebook.appmanager"]["risk"], bloat_db.RISK_SAFE)
         self.assertEqual(apps["com.android.chrome"]["risk"], bloat_db.RISK_FORBIDDEN)
         self.assertEqual(payload["counts"]["system"]["safe"], 1)
-        self.assertEqual(apps["com.facebook.appmanager"]["selected"], True)
+        self.assertEqual(apps["com.facebook.appmanager"]["selected"], False)
 
     def test_export_cancelled(self):
         with mock.patch.object(debloat_gui.filedialog, "asksaveasfilename",

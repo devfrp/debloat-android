@@ -66,11 +66,14 @@ HELP_TEXT = f"""\
 3) UTILISATION
    • « 🔄 Rafraîchir les appareils » : détecte le téléphone.
    • « 🔍 Scanner les applications » : liste tout et classe le bloat :
-       ✅ vert    = bloat classique, retrait considéré comme sûr (précoché),
+       ✅ vert    = bloat classique, retrait considéré comme sûr (à cocher toi-même),
        🟠 orange  = avancé (une fonctionnalité peut manquer après),
        ❔ inconnu = paquet non répertorié, évaluez-le vous-même,
        ⛔ rouge   = composant protégé, volontairement non décochable.
    • Le survol d'une ligne affiche une note explicative en bas de fenêtre.
+   • Tu coches toi-même chaque app à retirer : un clic sur la ligne, ou Espace
+     sur la ligne sélectionnée (colonne « Cocher »). Le bouton « ✅ Cocher les
+     sûrs (vue) » est un raccourci optionnel.
    • « 🗑️ Désinstaller la sélection » applique le retrait (avec confirmations adaptées).
    • « 💾 Rapport » : exporte le scan courant en fichier JSON archivable.
 
@@ -149,7 +152,8 @@ class DebloatApp:
         self._build_ui()
         self._after_id = self.root.after(120, self._poll)
         self._set_default_status()
-        self.log("Bienvenue ! Branche ton téléphone (débogage USB activé), puis clique « 🔄 Rafraîchir les appareils ».")
+        self.log("Bienvenue ! Branche ton téléphone (débogage USB activé), puis clique « 🔄 Rafraîchir les appareils ».\n"
+                 "Rien n'est coché d'office : coche chaque app que tu veux retirer, puis « 🗑️ Désinstaller la sélection ».")
         self.refresh_devices()
 
     # ------------------------------------------------------------------ UI
@@ -212,7 +216,7 @@ class DebloatApp:
         cols = ("check", "package", "app", "risk", "type")
         self.tree = ttk.Treeview(right, columns=cols, show="headings", selectmode="browse")
         for col, text, width, anchor in (
-            ("check", "⅋", 52, "center"),
+            ("check", "Cocher", 64, "center"),
             ("package", "Paquet", 390, "w"),
             ("app", "Application", 210, "w"),
             ("risk", "Risque", 130, "w"),
@@ -239,6 +243,7 @@ class DebloatApp:
         xsb.grid(row=2, column=0, sticky="ew")
 
         self.tree.bind("<Button-1>", self._on_tree_click)
+        self.tree.bind("<space>", self._on_space)
         self.tree.bind("<Double-1>", self._on_tree_double)
         self.tree.bind("<Motion>", self._on_tree_hover)
         self.tree.bind("<Leave>", lambda _e: self._set_default_status())
@@ -293,7 +298,7 @@ class DebloatApp:
         n = sum(1 for info in self.packages.values() if info.checked)
         self.lbl_status.config(
             text=f"{len(self.packages)} apps chargées — sélection : {n} — "
-                 "survole une ligne pour la note, double-clic pour les détails.")
+                 "un clic sur une ligne coche/décoche, survol = note, double-clic = détails.")
 
     def _spawn(self, fn, *args) -> None:
         threading.Thread(target=fn, args=args, daemon=True).start()
@@ -473,8 +478,9 @@ class DebloatApp:
         pkgs: dict[str, PackageInfo] = {}
         for pkg in sys_pkgs:
             risk, label, note = bloat_db.lookup(pkg)
-            pkgs[pkg] = PackageInfo(pkg, "system", risk, label, note,
-                                    checked=(risk == bloat_db.RISK_SAFE))
+            # Rien n'est précoché : l'utilisateur coche explicitement chaque app
+            # qu'il veut retirer (le bouton « ✅ Cocher les sûrs » reste un raccourci optionnel).
+            pkgs[pkg] = PackageInfo(pkg, "system", risk, label, note, checked=False)
         for pkg in usr_pkgs:
             if pkg in pkgs:
                 continue
@@ -506,7 +512,8 @@ class DebloatApp:
                  f"apps utilisateur 📦 {counts[('user', bloat_db.RISK_UNKNOWN)]}")
         self.view.set("bloat")
         self.refresh_tree()
-        self.q.put(("status", f"Scan fini — {len(pkgs)} apps. Le bloat ✅ est déjà coché."))
+        self.q.put(("status", f"Scan fini — {len(pkgs)} apps. "
+                            "Coche chaque app à retirer (clic sur la ligne), puis « 🗑️ Désinstaller »."))
 
     # ------------------------------------------------------------- tree
 
@@ -555,10 +562,7 @@ class DebloatApp:
         self._update_actionbar()
         self._set_default_status()
 
-    def _on_tree_click(self, event) -> None:
-        if self.tree.identify_region(event.x, event.y) not in ("cell", "tree"):
-            return
-        iid = self.tree.identify_row(event.y)
+    def _toggle_iid(self, iid: str) -> None:
         info = self.packages.get(iid)
         if info is None:
             return
@@ -574,6 +578,18 @@ class DebloatApp:
         self.tree.item(iid, values=vals)
         self._update_actionbar()
         self._set_default_status()
+
+    def _on_tree_click(self, event) -> None:
+        if self.tree.identify_region(event.x, event.y) not in ("cell", "tree"):
+            return
+        self._toggle_iid(self.tree.identify_row(event.y))
+
+    def _on_space(self, _event) -> None:
+        # Espace : coche/décoche la ligne sélectionnée au clavier
+        selection = self.tree.selection()
+        if selection:
+            self._toggle_iid(selection[0])
+            return "break"
 
     def _on_tree_double(self, event) -> None:
         iid = self.tree.identify_row(event.y)
