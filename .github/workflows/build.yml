@@ -128,15 +128,16 @@ jobs:
           else
             TAG="manual-$(date -u +%Y%m%d-%H%M%S)"
           fi
+          {
+            echo '- Linux : debloat-android-linux.AppImage (GUI)'
+            echo '- Windows : DebloatAndroid.exe (GUI) + debloat-cli.exe (CLI)'
+            echo '- macOS : debloat-android-macos.zip (GUI, .app non signe)'
+            echo ''
+            echo 'Les platform-tools ADB sont requis sur la machine hote.'
+          } > release-notes.md
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --title "Debloat Android $TAG" \
-            --notes "Paquets multi-plateformes .
-
-- Linux : debloat-android-linux.AppImage (GUI)
-- Windows : DebloatAndroid.exe (GUI) + debloat-cli.exe (CLI)
-- macOS : debloat-android-macos.zip (GUI, .app non signe)
-
-Les platform-tools ADB sont requis sur la machine hote." \
+            --notes-file release-notes.md \
             debloat-android-linux.AppImage DebloatAndroid.exe debloat-cli.exe debloat-android-macos.zip
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY"
