@@ -50,6 +50,10 @@ jobs:
             echo 'exec "$HERE/usr/bin/debloat-android" "$@"'
           } > "$APPDIR/AppRun"
           chmod 0755 "$APPDIR/AppRun"
+          python3 tools/make_icon.py "$APPDIR/debloat-android.png"
+          mkdir -p "$APPDIR/usr/share/icons/hicolor/128x128/apps"
+          cp "$APPDIR/debloat-android.png" \
+            "$APPDIR/usr/share/icons/hicolor/128x128/apps/debloat-android.png"
 
       - name: appimagetool -> .AppImage
         run: |
@@ -95,9 +99,8 @@ jobs:
 
       - name: PyInstaller (.app)
         run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install pyinstaller
-          pyinstaller --windowed --name DebloatAndroid debloat_gui.py
+          python3 -m pip install --break-system-packages pyinstaller
+          python3 -m PyInstaller --windowed --name DebloatAndroid debloat_gui.py
 
       - name: Archiver le .app
         run: |
