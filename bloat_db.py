@@ -24,6 +24,9 @@ FORBIDDEN_PREFIXES: tuple[str, ...] = (
     "com.android.",                          # Android core (systemui, providers, chrome, launcher3…)
     "android.",                              # AOSP packages without prefix
     "com.google.android.trichromelibrary",   # Mainline modules (WebView engine)
+    "com.google.android.overlay.",           # RRO overlays GMS (resource system)
+    "com.google.mainline.",                  # Mainline modules (adservices, telemetry)
+    "com.unisoc.connectivity.resources.overlay.",  # Unisoc connectivity overlays
 )
 
 FORBIDDEN: dict[str, tuple[str, str]] = {
@@ -51,6 +54,44 @@ FORBIDDEN: dict[str, tuple[str, str]] = {
     "com.huawei.systemmanager": ("Gestionnaire système (Huawei)", "Permissions / démarrage applications."),
     # ------------------------------------------------------------------ Sony
     "com.sonymobile.home": ("Xperia Home (lanceur)", "Écran d'accueil."),
+
+    # ============================ Google — modules core / mainline / overlays exacts
+    "com.google.android.packageinstaller": ("Installateur de paquets", "Installe les APK (core système)."),
+    "com.google.android.permissioncontroller": ("Gestionnaire d'autorisations", "Toutes les permissions du système passent par lui."),
+    "com.google.android.providers.media.module": ("Fournisseur de médias (module)", "Stockage photos/vidéos/fichiers — casserait la galerie et les téléchargements."),
+    "com.google.android.networkstack": ("Network Stack", "Réseau (DHCP, IP, connexions) — indispensable."),
+    "com.google.android.networkstack.overlay": ("Network Stack (overlay)", "Calque de ressources du Network Stack."),
+    "com.google.android.networkstack.tethering": ("Partage de connexion (module)", "Partage Wi-Fi/USB/Bluetooth."),
+    "com.google.android.networkstack.tethering.overlay": ("Partage de connexion (overlay)", "Calque de ressources du tethering."),
+    "com.google.android.captiveportallogin": ("Connexion Wi-Fi (portail)", "Écrans « connectez-vous » des Wi-Fi publics."),
+    "com.google.android.documentsui": ("Sélecteur de documents", "Explorateur/dossier utilisé par les apps (picker)."),
+    "com.google.android.cellbroadcastreceiver": ("Alertes diffusion cellulaire", "SMS d'urgence / alertes gouvernementales."),
+    "com.google.android.cellbroadcastservice": ("Service de diffusion cellulaire", "Cadre des alertes d'urgence."),
+    "com.google.android.setupwizard": ("Assistant de configuration", "Assistant du premier démarrage."),
+    "com.google.android.apps.setupwizard.searchselector": ("Assistant de configuration (recherche)", "Sélecteur de moteur de recherche pendant l'installation initiale."),
+    "com.google.android.signature": ("Signature", "Vérification de signatures (core)."),
+    "com.google.android.rkpdapp": ("Provisionnement de clés (RKPD)", "Protocole à distance pour les clés matérielles. Retrait peut casser l'attestation."),
+    "com.google.android.adservices.api": ("AdServices API", "Module publicité/limitation de suivi — module mainline, prudence."),
+    "com.google.android.appsearch.apk": ("AppSearch", "Indexation de recherche système."),
+    "com.google.android.safetycenter.resources": ("Safety Center (ressources)", "Calque de ressources du centre de sécurité Android."),
+    "com.google.android.uwb.resources": ("UWB (ressources)", "Calque de ressources ultra-large bande."),
+    "com.google.android.wifi.dialog": ("Wi-Fi (dialogues)", "Boîtes de dialogue Wi-Fi système."),
+    "com.google.android.wifi.resources": ("Wi-Fi (ressources)", "Calque de ressources Wi-Fi."),
+    "com.google.android.connectivity.resources": ("Connectivité (ressources)", "Calque de ressources des services de connexion — module mainline."),
+    "com.google.android.odad": ("ODAD (livraison OTA)", "Composant de livraison/mise à jour — déconseillé de retirer."),
+    "android": ("Cœur Android (framework)", "Le framework lui-même — JAMAIS touchable."),
+
+    # ============================ Unisoc / Spreadtrum — cœur critique (protégé)
+    "com.unisoc": ("Plateforme Unisoc", "Paquet racine du SoC Unisoc — indispensable."),
+    "com.unisoc.phone": ("Téléphonie Unisoc", "Cadre d'appel/messagerie du SoC."),
+    "com.unisoc.android.wifi": ("Wi-Fi Unisoc", "Service Wi-Fi du SoC — casserait le Wi-Fi."),
+    "com.unisoc.tui": ("Trusted UI Unisoc", "Saisie sécurisée (PIN SIM, biométrie)."),
+    "com.unisoc.silent.reboot": ("Redémarrage silencieux Unisoc", "Mécanisme de redémarrage du SoC."),
+    "com.unisoc.android.overlay.dualsim": ("Overlay double SIM Unisoc", "Calque de ressources pour le double SIM."),
+    "com.unisoc.color_display.overlay": ("Overlay affichage Unisoc", "Calque de ressources de l'affichage."),
+    "com.unisoc.power_qogirl6.overlay": ("Overlay énergie Unisoc", "Calque de ressources de la consommation."),
+    "com.spreadtrum.ims": ("IMS Spreadtrum", "VoLTE / appels via données (IMS Unisoc) — casseraient les appels."),
+    "com.sprd.providers.photos": ("Fournisseur photos Spreadtrum", "Données/galerie média du SoC."),
 }
 
 BLOAT_DB: dict[str, tuple[str, str, str]] = {
@@ -180,6 +221,65 @@ BLOAT_DB: dict[str, tuple[str, str, str]] = {
     "com.transsion.palmpay": (A, "PalmPay", "Portefeuille Tecno/Infinix."),
     "com.transsion.palmstore": (A, "Palm Store", "Boutique Tecno/Infinix."),
     "com.transsion.childmode": (S, "Mode enfant", "Mode enfant Tecno/Infinix."),
+    # ======================================================== DOOGEE
+    "com.doogee.update": (A, "DOOGEE Mise à jour système", "Vérifie/télécharge les OTA DOOGEE. S'il est retiré, les mises à jour constructeur sont possiblement bloquées."),
+    "com.doogee.udmc.client": (A, "DOOGEE UDMC Client", "Client de maintenance/télémétrie DOOGEE — pas d'usage pour l'utilisateur."),
+    # ======================================================== Unisoc / Spreadtrum (puces)
+    "com.sprd.engineermode": (A, "Menu d'ingénierie Unisoc", "Outil de diagnostic usine ; à éviter pour l'usage courant, retrait sans effet visible."),
+    "com.sprd.validationtools": (A, "Outils de validation usine", "Diagnostics d'usine Unisoc — sans rôle pour l'usager."),
+    "com.yk.factorytest": (A, "Test usine", "Diagnostic constructeur."),
+    "com.yk.phonetest": (A, "Test téléphone usine", "Diagnostic constructeur."),
+    "com.sprd.cameracalibration": (A, "Étalonnage caméra", "Calibrage caméra Unisoc — ne pas retirer si la caméra est capricieuse."),
+    "com.sprd.logmanager": (S, "Gestionnaire de logs Unisoc", "Journalisation constructeur — retrait sans effet visible."),
+    "com.sprd.linkturbo": (A, "Link Turbo Unisoc", "Accélération réseau (Wi-Fi + données) — l'enlever peut désactiver la fonction."),
+    "com.sprd.omacp": (A, "OMACP Unisoc", "Provisionnement opérateur (messages OMA) ; risque faible mais réel."),
+    "com.sprd.uasetting": (A, "Réglages Unisoc (UAS)", "Réglages constructeur divers."),
+    "com.tencent.soter.soterserver": (A, "Soter (Tencent)", "Stockage sécurisé biométrique utilisé par certaines apps — ne pas retirer si tu utilises des apps chinoises de paiement."),
+    "org.ifaa.aidl.manager": (A, "IFAA Manager", "Interface biométrique Alipay (IFAA) — inutile si tu ne paies pas via apps chinoises."),
+    # ======================================================== Google — apps stock installées en /system
+    "com.google.android.apps.docs": (S, "Google Drive (Docs)", "App Google préinstallée, réinstallable depuis le Play Store."),
+    "com.google.android.apps.maps": (S, "Google Maps", "App Google préinstallée, réinstallable depuis le Play Store."),
+    "com.google.android.apps.photos": (S, "Google Photos", "App Google préinstallée — vérifie qu'une galerie alternative existe avant de retirer."),
+    "com.google.android.apps.nbu.files": (S, "Files by Google", "Gestionnaire de fichiers Google, réinstallable depuis le Play Store."),
+    "com.google.android.apps.keep": (S, "Google Keep", "App Google préinstallée, réinstallable depuis le Play Store."),
+    "com.google.android.apps.bard": (S, "Gemini (assistance)", "Assistant IA Google ; retrait sans effet backend."),
+    "com.google.android.apps.wellbeing": (A, "Digital Wellbeing", "Usage écran/concentration — dégrade le confort si tu en dépendais."),
+    "com.google.android.apps.turbo": (A, "Device Health Services", "Intelligence de batterie (estimation, adaptatif) ; l'enlever enlève aussi la courbe « restant »."),
+    "com.google.android.apps.adm": (A, "Find My Device", "Retrouver/effacer un téléphone perdu. Retiré = plus de localisation à distance."),
+    "com.google.android.apps.safetyhub": (A, "Safety Hub", "Alertes d'urgence (séisme/période d'insécurité) — retire si tu n'en veux pas."),
+    "com.google.android.apps.restore": (A, "Google Restore", "Restauration initiale Google One (au premier démarrage) — réinstallable depuis le Play Store."),
+    "com.google.android.apps.carrier.carrierwifi": (A, "Carrier Wi-Fi", "Wi-Fi opérateur (Passpoint) — si ton opérateur l'expose, l'enlever coupe ça."),
+    "com.google.android.play.games": (S, "Play Jeux", "App Google préinstallée, réinstallable depuis le Play Store."),
+    "com.google.android.youtube": (S, "YouTube", "App Google préinstallée, réinstallable depuis le Play Store."),
+    "com.google.android.keep": (S, "Google Keep", "App Google préinstallée, réinstallable depuis le Play Store."),
+    "com.google.android.calendar": (S, "Google Agenda", "App Google préinstallée, réinstallable depuis le Play Store."),
+    "com.google.android.calculator": (S, "Calculatrice (Google)", "App Google préinstallée, réinstallable depuis le Play Store."),
+    "com.google.android.deskclock": (A, "Horloge (Google)", "Alarmes/horloge : retire seulement si tu as déjà une autre horloge installée."),
+    "com.google.android.contacts": (A, "Contacts (Google)", "App stocke — retirer seulement si tu as ton propre carnet."),
+    "com.google.android.apps.messaging": (A, "Messages (Google)", "App SMS/MMS par défaut — retirer seulement avec une app SMS installée."),
+    "com.google.android.dialer": (A, "Téléphone (Google)", "App d'appels par défaut — retirer seulement avec un dialer alternatif installé."),
+    "com.google.android.projection.gearhead": (A, "Android Auto", "Projection voiture."),
+    "com.google.android.gms.location.history": (A, "Historique de localisation GMS", "Composant temporel de GMS — retire plutôt GMS entier 'protégé'."),
+    "com.google.android.gms.supervision": (A, "Google Family Link (supervision)", "Supervision familiale (Family Link) — retire si tu ne l'utilises pas."),
+    "com.google.android.gmsintegration": (A, "Intégration GMS constructeur", "Lien constructeur vers Google (DOOGEE). Retrait sans effet usuel mais rester prudent."),
+    "com.google.android.photopicker": (A, "Sélecteur de photos système", "Sélecteur de photos/multimédia utilisé par les autres apps."),
+    "com.google.android.as": (A, "Android System Intelligence", "Fonctions intelligentes (suggestions de texte…) — dégradation douce sans plantage."),
+    "com.google.android.as.oss": (A, "Private Compute Services", "Assistant de confidentialité pour ASI."),
+    "com.google.android.ondevicepersonalization.services": (A, "Device Personalization Services", "Suggestions/mots — dégradation douce si retiré."),
+    "com.google.android.federatedcompute": (A, "Federated Compute", "Apprentissage fédéré Google — retrait sans effet visible pour l'usager."),
+    "com.google.android.onetimeinitializer": (A, "One-time initializer", "Initialisation du premier démarrage — retire après config, si besoin."),
+    "com.google.android.hotspot2.osulogin": (A, "Passpoint OSU Login", "Inscription Wi-Fi Passpoint — rarement nécessaire."),
+    "com.google.android.healthconnect.controller": (A, "Health Connect", "Hub santé/sport — retire seulement si tu n'utilises aucune app santé."),
+    "com.google.android.health.connect.backuprestore": (A, "Health Connect (sauvegarde)", "Sauvegarde/restauration pour Health Connect."),
+    "com.google.android.sdksandbox": (A, "SDK Runtime sandbox", "Bac à sable SDK (anon track)."),
+    "com.google.android.tag": (A, "NFC Tag", "Lecture de tags NFC — retire si tu ne les utilises pas."),
+    "com.google.ambient.streaming": (A, "Streaming multi-écran (Google)", "Diffusion vers ChromeOS/tablettes — retrait sans effet courant."),
+    "com.google.android.accessibility.switchaccess": (A, "Switch Access", "Accessibilité via boutons externes — retire seulement si non utilisé."),
+    "com.google.android.devicelockcontroller": (A, "Device Lock (opérateur)", "Verrou « appareil financé » par certains opérateurs — à garder si le téléphone est encore payé à crédit."),
+    "com.sprd.camta": (A, "Camta (test caméra Unisoc)", "Outil de test usine de la caméra."),
+    "com.sprd.powersavemodelauncher": (A, "Lanceur du mode économie d'énergie", "Écran allégé affiché en mode économie Unisoc — le retirer peut perturber ce mode."),
+    "com.spreadtrum.proxy.nfwlocation": (A, "Proxy localisation Unisoc (NFW)", "Service géoloc du SoC — peut affecter la localisation jusqu'à restauration."),
+    "com.spreadtrum.sgps": (A, "GPS Spreadtrum", "Service GPS du SoC — le retirer peut casser le GPS jusqu'à restauration."),
 }
 
 
