@@ -33,21 +33,22 @@ jobs:
           APPDIR=build/AppDir
           mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications"
           install -m 0755 dist/debloat-android "$APPDIR/usr/bin/debloat-android"
-          cat > "$APPDIR/usr/share/applications/debloat-android.desktop" <<'DESKTOP'
-[Desktop Entry]
-Type=Application
-Name=Debloat Android
-Comment=Retrait des apps systeme d'un smartphone Android, via ADB (sans root)
-Exec=AppRun
-Icon=debloat-android
-Categories=Utility;Development;
-DESKTOP
-          cp "$APPDIR/usr/share/applications/debloat-android.desktop" "$APPDIR/debloat-android.desktop"
-          cat > "$APPDIR/AppRun" <<'RUN'
-#!/bin/sh
-HERE="$(dirname "$(readlink -f "$0")")"
-exec "$HERE/usr/bin/debloat-android" "$@"
-RUN
+          {
+            echo '[Desktop Entry]'
+            echo 'Type=Application'
+            echo 'Name=Debloat Android'
+            echo 'Comment=Retrait des apps systeme d un smartphone Android, via ADB (sans root)'
+            echo 'Exec=AppRun'
+            echo 'Icon=debloat-android'
+            echo 'Categories=Utility;Development;'
+          } > "$APPDIR/usr/share/applications/debloat-android.desktop"
+          cp "$APPDIR/usr/share/applications/debloat-android.desktop" \
+            "$APPDIR/debloat-android.desktop"
+          {
+            echo '#!/bin/sh'
+            echo 'HERE="$(dirname "$(readlink -f "$0")")"'
+            echo 'exec "$HERE/usr/bin/debloat-android" "$@"'
+          } > "$APPDIR/AppRun"
           chmod 0755 "$APPDIR/AppRun"
 
       - name: appimagetool -> .AppImage
