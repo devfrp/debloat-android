@@ -97,8 +97,10 @@ class CliSubprocess(unittest.TestCase):
         code, out, err = self.run_cli("scan")
         self.assertEqual(code, 0, err)
         self.assertIn("com.facebook.appmanager", out)
-        self.assertIn("safe 1", out)
-        self.assertIn("forbidden 1", out)   # chrome (gms est hors image fake)
+        self.assertIn("sûr 1", out)
+        self.assertIn("protégées masquées : 1", out)   # chrome (gms est hors image fake)
+        self.assertIn("[sûr] com.facebook.appmanager", out)
+        self.assertNotIn("com.android.chrome", out)
         self.assertIn("Pixel FAKE", out)
 
     def test_scan_json(self):

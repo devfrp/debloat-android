@@ -37,6 +37,15 @@ RISK_ORDER = {
     bloat_db.RISK_FORBIDDEN: 3,
 }
 
+# Deux modes seulement : les hors-base s'affichent « avancé (non répertorié) »,
+# les composants protégés sont masqués de la table (sauf demande explicite).
+RISK_TXT = {
+    bloat_db.RISK_SAFE: "sûr",
+    bloat_db.RISK_ADVANCED: "avancé",
+    bloat_db.RISK_UNKNOWN: "avancé (non répertorié)",
+    bloat_db.RISK_FORBIDDEN: "protégé (verrouillé)",
+}
+
 
 
 EXIT_OK, EXIT_ERR, EXIT_REFUSED = 0, 1, 2
@@ -112,9 +121,22 @@ def cmd_scan(args) -> int:
     counts = Counter(apps[p]["risk"] for p in ordered)
 
     want_risks = {r.strip() for r in (args.risk or "").split(",") if r.strip()}
+    # Alias deux-modes : « advanced » englobe les paquets hors base.
+    if "advanced" in want_risks:
+        want_risks.add(bloat_db.RISK_UNKNOWN)
+    if "unknown" in want_risks:
+        want_risks.discard("unknown")
+        want_risks.add(bloat_db.RISK_ADVANCED)
+        want_risks.add(bloat_db.RISK_UNKNOWN)
     query = (args.search or "").strip().lower()
-    shown = [
+    ordered_shown = [
         p for p in ordered
+        if apps[p]["risk"] != bloat_db.RISK_FORBIDDEN
+        or bloat_db.RISK_FORBIDDEN in want_risks
+    ]
+    # Par défaut (sans --risk) : les deux modes, protégés masqués.
+    shown = [
+        p for p in ordered_shown
         if (not want_risks or apps[p]["risk"] in want_risks)
         and (not query or query in p.lower()
              or query in (apps[p]["label"] or "").lower())
@@ -125,18 +147,21 @@ def cmd_scan(args) -> int:
         print(f"Appareil : {_device_label(props, adb.serial)}"
               + (f"  —  filtre « {args.search} »" if query else ""))
         print(f"Total : {len(apps)} app(s) — "
-              + " • ".join(f"{r} {counts[r]}" for r in
-                           ("safe", "advanced", "unknown", "forbidden", "user")))
+              f"sûr {counts['safe']} • "
+              f"avancé {counts['advanced'] + counts['unknown']} "
+              f"(dont {counts['unknown']} non répertoriée(s)) • "
+              f"utilisateur {counts['user']}"
+              f" — protégées masquées : {counts['forbidden']}")
         print("-" * 78)
         for pkg in shown:
             info = apps[pkg]
             if info["type"] == "user":
-                suffix = "  (app utilisateur)"
-            elif info["label"]:
-                suffix = f"  ({info['label']})"
-            else:
+                tag = "utilisateur"
                 suffix = ""
-            print(f"{pkg}{suffix}")
+            else:
+                tag = RISK_TXT.get(info["risk"], info["risk"])
+                suffix = f"  ({info['label']})" if info["label"] else ""
+            print(f"[{tag}] {pkg}{suffix}")
     if not shown and (args.search or want_risks):
         print("(aucune app correspondante)")
 
@@ -191,8 +216,8 @@ def cmd_uninstall(args) -> int:
             print(f"   {pkg}   {bloat_db.lookup(pkg)[1]}", file=sys.stderr)
         return EXIT_REFUSED
     if unknown and not args.allow_unknown:
-        print("Refusé : paquet(s) inconnu(s) de la base — relance avec --allow-unknown "
-              "si tu sais ce que tu fais :", file=sys.stderr)
+        print("Refusé : avancée(s) non répertoriée(s) — relance avec "
+              "--allow-unknown si tu sais ce que tu fais :", file=sys.stderr)
         for pkg in unknown:
             print(f"   {pkg}", file=sys.stderr)
         return EXIT_REFUSED
@@ -212,10 +237,12 @@ def cmd_uninstall(args) -> int:
         return EXIT_OK
 
     counts = Counter(apps[p]["risk"] for p in targets)
+    n_adv = counts["advanced"] + counts["unknown"]
+    extra = (f" dont {counts['unknown']} non répertoriée(s)" if counts["unknown"] else "")
     if not _confirm(
             f"Retirer {len(targets)} app(s) sur {device} "
-            f"(sûres {counts['safe']} • avancées {counts['advanced']} • "
-            f"inconnues {counts['unknown']} • utilisateur {counts['user']}) ?",
+            f"(sûres {counts['safe']} • avancées {n_adv}{extra} • "
+            f"utilisateur {counts['user']}) ?",
             args.yes):
         print("Abandon.")
         return EXIT_OK
@@ -364,7 +391,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_scan = sub.add_parser("scan", help="scanner + classifier les apps")
     p_scan.add_argument("--search", help="chaîne contenue dans le paquet ou le libellé")
-    p_scan.add_argument("--risk", help="risques affichés, ex : safe,advanced (défaut : tout)")
+    p_scan.add_argument("--risk", help="modes affichés : safe,advanced (défaut : sûr + "
+                      "avancé ; unknown est fusionné dans advanced ; forbidden "
+                      "masqué sauf s'il est demandé explicitement)")
     p_scan.add_argument("--json", action="store_true", help="imprimer le scan en JSON")
     p_scan.add_argument("--report", metavar="FILE", help="écrire le scan en JSON dans FILE")
     p_scan.add_argument("--rule", action="store_true",

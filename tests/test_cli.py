@@ -58,18 +58,42 @@ class Devices(CliHarness):
 
 
 class Scan(CliHarness):
-    def test_scan_table(self):
+    def test_scan_table_two_modes(self):
         code, out, _ = self.cli("scan")
         self.assertEqual(code, 0)
-        self.assertIn("com.facebook.appmanager", out)
-        self.assertIn("safe 1", out)
-        self.assertIn("forbidden 2", out)
+        # compteur deux-modes + masquage des protégées
+        self.assertIn("sûr 1", out)
+        self.assertIn("avancé 2", out)
+        self.assertIn("dont 1 non répertoriée(s)", out)
+        self.assertIn("utilisateur 1", out)
+        self.assertIn("protégées masquées : 2", out)
+        # la table : protégées absentes, tag de mode sur les lignes
+        self.assertIn("[sûr] com.facebook.appmanager", out)
+        self.assertIn("[avancé] com.netflix.mediaclient", out)
+        self.assertIn("[avancé (non répertorié)] com.paquet.inconnu.x", out)
+        self.assertIn("[utilisateur] org.perso.app", out)
+        self.assertNotIn("com.google.android.gms", out)
+        self.assertNotIn("com.android.chrome", out)
 
     def test_scan_filter_risk(self):
         code, out, _ = self.cli("scan", "--risk", "safe")
         self.assertEqual(code, 0)
         self.assertIn("com.facebook.appmanager", out)
         self.assertNotIn("com.netflix.mediaclient", out)
+
+    def test_scan_filter_advanced_includes_unlisted(self):
+        code, out, _ = self.cli("scan", "--risk", "advanced")
+        self.assertEqual(code, 0)
+        self.assertIn("com.netflix.mediaclient", out)
+        self.assertIn("com.paquet.inconnu.x", out)
+        self.assertNotIn("com.facebook.appmanager", out)
+
+    def test_scan_forbidden_only_when_explicit(self):
+        code, out, _ = self.cli("scan", "--risk", "forbidden")
+        self.assertEqual(code, 0)
+        self.assertIn("com.google.android.gms", out)
+        self.assertIn("com.android.chrome", out)
+        self.assertIn("protégé (verrouillé)", out)
 
     def test_scan_search(self):
         code, out, _ = self.cli("scan", "--search", "netflix")

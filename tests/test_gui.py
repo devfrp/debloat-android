@@ -98,53 +98,61 @@ class ScanAndViews(GuiBase):
         self.assertIn("Pixel Test", header)
         self.assertIn("Android 14", header)
 
-    def test_bloat_view_only_safe_and_advanced(self):
+    def test_safe_mode_only_safe_rows(self):
+        # mode par défaut après le scan (VIEW_SAFE)
         iids = self.app._iids()
-        self.assertEqual(set(iids),
-                         {"com.facebook.appmanager", "com.netflix.mediaclient"})
+        self.assertEqual(iids, ["com.facebook.appmanager"])
 
-    def test_protected_view_shows_forbidden_rows_locked(self):
-        self.app.view.set("protected")
+    def test_advanced_mode_includes_unlisted_and_user(self):
+        self.app.view.set("advanced")
         self.app.refresh_tree()
+        self.assertEqual(set(self.app.tree.get_children("")),
+                         {"com.netflix.mediaclient", "com.paquet.inconnu.x",
+                          "org.perso.app"})
+        # les protégées n'appartiennent à aucun mode
+        self.assertNotIn("com.google.android.gms", self.app.tree.get_children(""))
+        self.assertNotIn("com.android.chrome", self.app.tree.get_children(""))
+
+    def test_protected_hidden_but_search_surfaces_them_locked(self):
+        self.app.search.set("gms")
+        self.pump(5)
         rows = self.app.tree.get_children("")
-        self.assertEqual(set(rows),
-                         {"com.google.android.gms", "com.android.chrome"})
-        # aucun élément de la vue protégée n'est décochable
-        for iid in rows:
-            self.assertFalse(self.app.packages[iid].checkable())
-            self.assertEqual(self.app.tree.item(iid, "values")[0], "[!]")
+        self.assertEqual(rows, ("com.google.android.gms",))
+        # verrouillée et identifiable
+        self.assertFalse(self.app.packages["com.google.android.gms"].checkable())
+        self.assertEqual(self.app.tree.item(rows[0], "values")[0], "[!]")
+        values = self.app.tree.item(rows[0], "values")
+        self.assertIn("protégée", values[3])
 
-    def test_user_view(self):
-        self.app.view.set("user")
+    def test_user_row_in_advanced_mode(self):
+        self.app.view.set("advanced")
         self.app.refresh_tree()
-        self.assertEqual(set(self.app.tree.get_children("")), {"org.perso.app"})
-
-    def test_all_view_counts_everything(self):
-        self.app.view.set("all")
-        self.app.refresh_tree()
-        self.assertEqual(len(self.app.tree.get_children("")), len(self.app.packages))
+        values = self.app.tree.item("org.perso.app", "values")
+        self.assertEqual(values[3], "app utilisateur")
+        self.assertEqual(values[4], "utilisateur")
 
     def test_search_filter(self):
-        self.app.view.set("all")
+        self.app.view.set("advanced")
         self.app.search.set("netflix")
         self.pump(5)
         self.assertEqual(self.app._iids(), ["com.netflix.mediaclient"])
         self.app.search.set("")
         self.pump(5)
-        self.assertEqual(len(self.app._iids()), len(self.app.packages))
+        self.assertEqual(len(self.app._iids()), 3)
 
-    def test_counts_label_updated(self):
+    def test_counts_label_two_modes(self):
         text = self.app.lbl_counts.cget("text")
-        self.assertIn("Sûrs : 1", text)
-        self.assertIn("Avancés : 1", text)
-        self.assertIn("Protégés : 2", text)
-        self.assertIn("Apps utilisateur : 1", text)
+        self.assertIn("Sûres : 1", text)
+        self.assertIn("Avancées : 1", text)
+        self.assertIn("dont 1 non listées", text)
+        self.assertIn("Utilisateur : 1", text)
+        self.assertIn("Protégées (verrouillées) : 2", text)
 
 
 class CheckboxFlow(GuiBase):
     def test_toggle_via_click_updates_tree_and_actionbar(self):
-        pkg = "com.netflix.mediaclient"
-        self.app.view.set("bloat")
+        pkg = "com.netflix.mediaclient"        # avancée -> visible en mode Avancé
+        self.app.view.set("advanced")
         self.app.refresh_tree()
         # simule le clic : la méthode prend (x, y) ; on passe par l'identifiant
         # déjà résolu -> on appelle le cœur du toggle
@@ -158,7 +166,8 @@ class CheckboxFlow(GuiBase):
 
     def test_forbidden_log_on_toggle_attempt(self):
         pkg = "com.google.android.gms"
-        self.app.view.set("protected")
+        # la ligne est verrouillée : retrouvable par la recherche, jamais cocher
+        self.app.search.set("gms")
         self.app.refresh_tree()
         evt = mock.Mock()
         evt.x, evt.y = 10, 10
@@ -170,7 +179,7 @@ class CheckboxFlow(GuiBase):
 
     def test_space_toggles_selected_row(self):
         pkg = "com.netflix.mediaclient"
-        self.app.view.set("bloat")
+        self.app.view.set("advanced")
         self.app.refresh_tree()
         self.app.tree.selection_set(pkg)
         self.assertFalse(self.app.packages[pkg].checked)
@@ -181,28 +190,23 @@ class CheckboxFlow(GuiBase):
         self.assertFalse(self.app.packages[pkg].checked)
 
     def test_select_all_safe_only(self):
-        self.app.view.set("bloat")
-        self.app.refresh_tree()
         self.app.select_all(True)
         checked = {p for p, i in self.app.packages.items()
                    if i.checked and i.ptype == "system"}
         self.assertEqual(checked, {"com.facebook.appmanager"})
 
-    def test_select_all_includes_advanced_only_in_view(self):
-        self.app.view.set("bloat")
+    def test_select_all_in_advanced_mode_checks_all_and_warns(self):
+        self.app.view.set("advanced")
         self.app.refresh_tree()
         self.app.select_all(False)
         checked = {p for p, i in self.app.packages.items()
                    if i.checked and i.ptype == "system"}
-        self.assertEqual(checked, {"com.facebook.appmanager", "com.netflix.mediaclient"})
-
-    def test_select_all_in_system_view_warns_unknown(self):
-        self.app.view.set("system")
-        self.app.refresh_tree()
-        self.app.select_all(False)
-        self.assertIn("paquets inconnus", self.log_text())
-        checked_unknown = self.app.packages["com.paquet.inconnu.x"]
-        self.assertTrue(checked_unknown.checked)
+        # le mode Avancé ne montre que ses propres lignes :
+        # avancées + non listées (facebook « sûre » reste hors mode)
+        self.assertEqual(checked,
+                         {"com.netflix.mediaclient", "com.paquet.inconnu.x"})
+        self.assertIn("non répertoriés", self.log_text())
+        self.assertIn("mode « advanced »", self.log_text())
 
     def test_clear_checks(self):
         self.app.select_all(False)
@@ -229,7 +233,7 @@ class DetailsDialog(GuiBase):
         title, message = args[0], args[1]
         self.assertEqual(title, "Facebook App Manager")
         self.assertIn("app système", message)
-        self.assertIn("sans danger", message)
+        self.assertIn("sûre", message)
 
 
 class Uninstall(GuiBase):
@@ -282,6 +286,69 @@ class Uninstall(GuiBase):
         data = _load(path)
         hist = {h["package"]: h["type"] for h in data["history"]}
         self.assertEqual(hist["org.perso.app"], "user")
+
+    def test_safe_selection_single_confirmation(self):
+        # dialogue 1 : confirmation du mode Sûr ; dialogue 2 : proposition APK.
+        # Tout autre dialogue lèverait StopIteration -> échec du test.
+        self.app.packages["com.facebook.appmanager"].checked = True
+        with mock.patch.object(debloat_gui.messagebox, "askyesno",
+                               side_effect=[True, True]):
+            self.app.uninstall_selected()
+        self.pump(40)
+        done = {p for p, _flags in self.fake.uninstalled}
+        self.assertIn("com.facebook.appmanager", done)
+
+    def test_advanced_selection_needs_two_confirmations(self):
+        pkg = "com.netflix.mediaclient"
+        self.app.packages[pkg].checked = True
+        # confirmation 1 refusée -> rien
+        with mock.patch.object(debloat_gui.messagebox, "askyesno",
+                               side_effect=[False]):
+            self.app.uninstall_selected()
+        self.pump(20)
+        self.assertEqual(self.fake.uninstalled, [])
+        # confirmation 1 OK, confirmation 2 refusée -> rien
+        with mock.patch.object(debloat_gui.messagebox, "askyesno",
+                               side_effect=[True, False]):
+            self.app.uninstall_selected()
+        self.pump(20)
+        self.assertEqual(self.fake.uninstalled, [])
+        # exactement trois dialogues : confirmation 1, confirmation 2, proposition APK
+        with mock.patch.object(debloat_gui.messagebox, "askyesno",
+                               side_effect=[True, True, True]):
+            self.app.uninstall_selected()
+        self.pump(40)
+        done = {p for p, _flags in self.fake.uninstalled}
+        self.assertIn(pkg, done)
+
+    def test_user_only_selection_skips_advanced_dialogs(self):
+        # exactement deux dialogues : avertissement définitif + proposition APK
+        self.app.packages["org.perso.app"].checked = True
+        with mock.patch.object(debloat_gui.messagebox, "askyesno",
+                               side_effect=[True, True]):
+            self.app.uninstall_selected()
+        self.pump(40)
+        done = {p for p, _flags in self.fake.uninstalled}
+        self.assertIn("org.perso.app", done)
+
+    def test_user_only_refusal_blocks_uninstall(self):
+        self.app.packages["org.perso.app"].checked = True
+        with mock.patch.object(debloat_gui.messagebox, "askyesno",
+                               side_effect=[False]):
+            self.app.uninstall_selected()
+        self.pump(20)
+        self.assertEqual(self.fake.uninstalled, [])
+
+    def test_advanced_with_user_extra_definitive_dialog(self):
+        # avancée + utilisateur : 2 confirmations + garde-fou + proposition APK
+        self.app.packages["com.netflix.mediaclient"].checked = True
+        self.app.packages["org.perso.app"].checked = True
+        with mock.patch.object(debloat_gui.messagebox, "askyesno",
+                               side_effect=[True, True, False]):
+            self.app.uninstall_selected()
+        self.pump(20)
+        # le garde-fou définitif a refusé -> aucun retrait malgré les 2 confirmations
+        self.assertEqual(self.fake.uninstalled, [])
 
     def test_apk_backup_proposal_accepted(self):
         pkg = "com.facebook.appmanager"
@@ -397,11 +464,13 @@ class Stress(GuiBase):
         self.assertEqual(self.app.packages["com.vendor.app42"].risk,
                          bloat_db.RISK_UNKNOWN)
 
-        self.app.view.set("all")
+        self.app.view.set("advanced")
         t1 = time.perf_counter()
         self.app.refresh_tree()
         elapsed_refresh = time.perf_counter() - t1
-        self.assertEqual(len(self.app.tree.get_children("")), 1500 + len(FAKE_SYS))
+        # mode Avancé = 1500 hors-base (unknown) + netflix + inconnu.x ;
+        # gms/chrome protégées masquées, facebook sûre hors mode
+        self.assertEqual(len(self.app.tree.get_children("")), 1500 + 2)
         t2 = time.perf_counter()
         self.app.search.set("vendor")
         self.pump(10, delay=0.005)

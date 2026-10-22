@@ -5,7 +5,9 @@ stdlib Python — zéro dépendance) et un **compagnon CLI**, avec les mêmes ga
 ([English README](README.md))
 
 - Détecte le téléphone branché en USB (débogage USB activé).
-- Liste toutes les apps et les classe : bloat sûr, avancé, inconnu, composants protégés.
+- Classe les apps dans **deux modes seulement** : **Sûr** (retraits recommandés) et
+  **Avancé** (prudence — les paquets hors base apparaissent aussi là, notés
+  « avancée (non listée) »).
 - Désinstalle les apps système pour ton profil utilisateur (`pm uninstall --user 0`)
   -> **réversible** : chaque retrait est consigné dans un backup JSON et restaurable en un clic.
 - **Rien n'est coché d'office** après un scan : l'utilisateur coche explicitement chaque app
@@ -43,18 +45,22 @@ stdlib Python — zéro dépendance) et un **compagnon CLI**, avec les mêmes ga
 
 **Rafraîchir les appareils -> Scanner les applications -> cocher chaque app à retirer -> Désinstaller la sélection.**
 
-| Colonne | Signification | Comportement |
+Après un scan, le panneau gauche propose exactement deux modes :
+
+| Mode | Contenu | Confirmation à la désinstallation |
 |---|---|---|
-| `sans danger` (sûr) | bloat classique, retrait considéré sûr | à cocher toi-même (aucune coche automatique) |
-| `avancé` | une fonctionnalité peut disparaître | décochée, confirmation douce |
-| `inconnu` (hors base) | pas dans la base | décochée, double confirmation |
-| `protégé` | verrouillé (Play services, WebView, clavier…) | non cochable — verrouillé |
-| app utilisateur (Play Store) | suppression définitive | confirmation distincte |
+| **Sûr** | bloat système dont le retrait est considéré sûr | une seule confirmation |
+| **Avancé** | apps système avancées + paquets hors base (« avancée (non listée) ») + apps utilisateur | deux confirmations, plus un garde-fou rouge dédié aux apps utilisateur (suppression définitive) |
+
+Les composants protégés (Play services, IMS/téléphonie, network stack, overlays…)
+n'appartiennent à **aucun mode** : ils restent masqués des listes de travail et
+verrouillés. La recherche d'un nom de paquet révèle sa ligne verrouillée avec
+l'explication.
 
 Autres fonctions : « Rapport » (export JSON du scan), « Gestionnaire de backups »
-(restauration), vues filtrées (bloat / protégé / système / utilisateur / tout), recherche,
-journal détaillé, notes au survol, double-clic pour les détails. Après chaque retrait, une
-entrée est ajoutée automatiquement au journal JSON de restauration.
+(restauration), recherche, journal détaillé, notes au survol, double-clic pour les
+détails. Après chaque retrait, une entrée est ajoutée automatiquement au journal JSON
+de restauration.
 
 ## Compagnon CLI
 
@@ -62,14 +68,17 @@ Mêmes garde-fous, sans fenêtre :
 
 ```bash
 python3 debloat_cli.py devices                     # appareils détectés
-python3 debloat_cli.py scan                        # scan + classification
-python3 debloat_cli.py scan --risk safe,advanced   # filtre par risque
-python3 debloat_cli.py scan --json                 # sortie JSON (stdout)
+python3 debloat_cli.py scan                        # deux modes : sûr / avancé (hors base fusionné)
+python3 debloat_cli.py scan --risk safe,advanced   # filtre par mode (unknown -> avancé)
+python3 debloat_cli.py scan --json                 # sortie JSON (stdout, risques bruts)
 python3 debloat_cli.py uninstall com.miui.msa.global --yes
 python3 debloat_cli.py uninstall com.miui.msa.global --backup-apks --yes   # + sauvegarde APK
 python3 debloat_cli.py uninstall com.paquet.???    # refusé : exige --allow-unknown
 python3 debloat_cli.py restore --file backups/X.json --dry-run
 ```
+
+Les composants protégés sont masqués de la table par défaut (les afficher :
+`scan --risk forbidden`) ; ils sont refusés à la désinstallation.
 
 Codes de sortie : `0` ok, `1` erreur/échec adb, `2` garde-fou (paquet protégé/inconnu/app
 utilisateur sans opt-in). Option globale `--serial S` si plusieurs appareils.
@@ -115,8 +124,9 @@ l'utilisateur décide.
 - `bloat_db.py` : intégrité (noms/risques), aucun recouvrement base/interdits, préfixes.
 - `debloat_cli.py` : garde-fous (protégé refusé, inconnu opt-in, utilisateur opt-in),
   dry-run, codes de sortie, journal, `--backup-apks`.
-- **GUI complète sous Xvfb** (auto-adopt, vues, coches, désinstallation, backup corrompu,
-  restauration, export, proposition de sauvegarde APK, réactions aux erreurs adb) avec faux ADB.
+- **GUI complète sous Xvfb** (auto-adopt, les deux modes, coches, désinstallation,
+  backup corrompu, restauration, export, proposition de sauvegarde APK, réactions aux
+  erreurs adb) avec faux ADB, incluant un stress de 1500 apps.
 - **Intégration subprocess** : le CLI exécuté pour de vrai contre un faux binaire `adb` —
   test du vrai chemin `shutil.which -> subprocess -> parsing`, `-s <serial>` consommé par adb inclus.
 - **Stress** : scan de 1500 apps -> scan ~1 s, refresh ~0,02 s.

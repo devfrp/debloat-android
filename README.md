@@ -4,7 +4,9 @@ Debloat an Android phone **without root**, using ADB: a Tkinter **GUI** (pure Py
 standard library — zero dependencies) and a **CLI companion**, with the same guardrails.
 
 - Detects the phone plugged over USB (USB debugging enabled).
-- Lists every app and classifies it: safe bloat, advanced, unknown, protected OS components.
+- Classifies apps into **two modes only**: **Sûr** (recommended removals) and
+  **Avancé** (prudence — unlisted packages also appear there, shown as
+  "avancée (non listée)").
 - Removes system apps for your user profile (`pm uninstall --user 0`): the APK stays on
   the phone, so it is **reversible**. Every removal is recorded in a JSON backup file and
   can be restored in one click.
@@ -43,18 +45,20 @@ standard library — zero dependencies) and a **CLI companion**, with the same g
 
 **Refresh devices -> Scan apps -> check each app you want to remove -> Uninstall selection.**
 
-| Column value | Meaning | Behavior |
+After a scan, the left panel offers exactly two modes:
+
+| Mode | Content | Uninstall confirmation |
 |---|---|---|
-| `sans danger` (safe) | classic bloat, removal considered safe | user must check it explicitly |
-| `avancé` (advanced) | some functionality may disappear | unchecked, softer confirmation |
-| `inconnu` (unknown) | not in the database | unchecked, double confirmation |
-| `protégé` (protected) | locked OS component (Play services, WebView, keyboard, launcher...) | cannot be checked |
-| user app (Play Store) | permanent removal | dedicated confirmation |
+| **Sûr** | system bloat whose removal is considered safe | single confirmation |
+| **Avancé** | advanced system apps + unlisted packages ("avancée (non listée)") + user apps | two confirmations, plus a dedicated red guard for user apps (permanent deletion) |
+
+Protected OS components (Play services, IMS/telephony, network stack, overlays...)
+belong to **no mode**: they stay hidden from the working lists and permanently
+locked. Searching a package name reveals its locked row with an explanation.
 
 Other functions: "Rapport" (export the scan as JSON), "Gestionnaire de backups" (restore),
-filtered views (bloat / protected / system / user / all), search, detailed log, notes on
-hover, double-click for details. After each removal a JSON ledger entry is written
-automatically, so restoration stays possible.
+search, detailed log, notes on hover, double-click for details. After each removal a
+JSON ledger entry is written automatically, so restoration stays possible.
 
 ## CLI companion
 
@@ -62,14 +66,17 @@ Same guardrails, no window:
 
 ```bash
 python3 debloat_cli.py devices                     # detected devices
-python3 debloat_cli.py scan                        # scan + classification
-python3 debloat_cli.py scan --risk safe,advanced   # filter by risk
-python3 debloat_cli.py scan --json                 # JSON output (stdout)
+python3 debloat_cli.py scan                        # two modes: sûr / avancé (unlisted folded in)
+python3 debloat_cli.py scan --risk safe,advanced   # filter by mode (unknown -> advanced)
+python3 debloat_cli.py scan --json                 # JSON output (stdout, raw risks)
 python3 debloat_cli.py uninstall com.miui.msa.global --yes
 python3 debloat_cli.py uninstall com.miui.msa.global --backup-apks --yes   # also pull APKs
 python3 debloat_cli.py uninstall com.unknown.pkg   # refused: needs --allow-unknown
 python3 debloat_cli.py restore --file backups/X.json --dry-run
 ```
+
+Protected components are hidden from the default table (show them with
+`scan --risk forbidden`); they are refused at uninstall.
 
 Exit codes: `0` ok, `1` adb error / failure, `2` guardrail refusal (protected package,
 unknown package or user app without explicit opt-in). Global option `--serial S` when
@@ -114,8 +121,9 @@ A package missing from the database shows up as *unknown* — nothing breaks, th
 - `bloat_db.py`: integrity (names/risks), no overlap between database and forbidden list, prefixes.
 - `debloat_cli.py`: guardrails (protected refused, unknown opt-in, user opt-in), dry-run,
   exit codes, backup ledger, `--backup-apks`.
-- **Full GUI tests under Xvfb** (auto-adoption, views, checking, uninstall, corrupted
-  backup, restore, export, APK-backup proposal, adb error handling) against a fake ADB.
+- **Full GUI tests under Xvfb** (auto-adoption, the two modes, checking, uninstall,
+  corrupted backup, restore, export, APK-backup proposal, adb error handling) against a
+  fake ADB, including a 1500-app stress run.
 - **Subprocess integration**: the real CLI is executed against a fake `adb` binary —
   exercising the genuine `shutil.which -> subprocess -> parsing` chain, including
   `-s <serial>` being consumed by adb itself.

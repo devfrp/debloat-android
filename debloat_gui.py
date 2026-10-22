@@ -27,7 +27,7 @@ import backup
 from adb import Adb, AdbError, DeviceInfo
 
 APP_TITLE = "Debloat Android"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.3.0"
 
 RISK_ORDER = {
     bloat_db.RISK_SAFE: 0,
@@ -36,12 +36,18 @@ RISK_ORDER = {
     bloat_db.RISK_FORBIDDEN: 3,
 }
 
+# Deux modes seulement : « Sûr » (recommandées) et « Avancé » (prudence).
+# Les paquets hors base s'affichent comme avancées non listées ; les composants
+# protégés ne font pas partie des modes : masqués, retrouvables par la recherche.
 RISK_TEXT = {
-    bloat_db.RISK_SAFE: "sans danger",
-    bloat_db.RISK_ADVANCED: "avancé",
-    bloat_db.RISK_UNKNOWN: "inconnu",
-    bloat_db.RISK_FORBIDDEN: "protégé",
+    bloat_db.RISK_SAFE: "sûre",
+    bloat_db.RISK_ADVANCED: "avancée",
+    bloat_db.RISK_UNKNOWN: "avancée (non listée)",
+    bloat_db.RISK_FORBIDDEN: "protégée (verrouillée)",
 }
+
+VIEW_SAFE = "safe"
+VIEW_ADV = "advanced"
 
 CHECK_ON, CHECK_OFF, CHECK_LOCK = "[x]", "[ ]", "[!]"
 
@@ -63,19 +69,25 @@ DEBLOAT ANDROID — guide d'utilisation
    • Brancher le câble USB, puis accepter la boîte de dialogue « Autoriser le
      débogage USB » sur le téléphone (cocher « Toujours autoriser »).
 
-3) UTILISATION
+3) UTILISATION — DEUX MODES
    • «  Rafraîchir les appareils » : détecte le téléphone.
-   • «  Scanner les applications » : liste tout et classe le bloat :
-       vert    = bloat classique : retrait considéré comme sûr (à cocher toi-même),
-       orange  = avancé (une fonctionnalité peut manquer après),
-       inconnu = paquet non répertorié, évalue-le toi-même,
-       rouge   = composant protégé, volontairement non décochable.
+   • «  Scanner les applications » : classe les apps dans deux modes seulement :
+       Sûr    = retrait recommandé, sans danger attendu (mode sélectionné après scan),
+       Avancé = prudence — une fonctionnalité peut manquer après retrait. Les paquets
+                hors base s'y affichent comme « avancée (non listée) ».
+     Les composants protégés (Play services, IMS, téléphonie…) n'appartiennent
+     à aucun mode : ils sont masqués et toujours verrouillés au retrait. La
+     recherche permet de les retrouver (ligne verrouillée).
    • Le survol d'une ligne affiche une note explicative en bas de fenêtre.
    • Tu coches toi-même chaque app à retirer : un clic sur la ligne, ou Espace
      sur la ligne sélectionnée (colonne « Cocher »). Le bouton « Cocher les
-     sûrs (vue) » est un raccourci optionnel.
-   • « Désinstaller la sélection » applique le retrait (avec confirmations adaptées).
-• Au moment de retirer, l'app propose de sauvegarder les APK de la sélection sur le PC.
+     sûres (mode) » est un raccourci optionnel.
+   • « Désinstaller la sélection » applique le retrait :
+       mode Sûr    -> une seule confirmation,
+       mode Avancé -> deux confirmations,
+     et l'app propose de sauvegarder les APK de la sélection sur le PC.
+     Les apps utilisateur (Play Store) déclenchent en plus l'avertissement
+     de suppression définitive.
    • « Rapport » : exporte le scan courant en fichier JSON archivable.
 
 4) CE QUE L'APP FAIT TECHNIQUEMENT
@@ -83,7 +95,7 @@ DEBLOAT ANDROID — guide d'utilisation
        -> retire l'app pour votre profil : l'APK reste sur le téléphone et tout
          peut être restauré. C'est la méthode standard des outils de débloat.
    • App utilisateur (Play Store) : pm uninstall <paquet>
-       -> SUPPRESSION DEFINITIVE, données perdues (réinstallez depuis une boutique).
+       -> SUPPRESSION DÉFINITIVE, données perdues (réinstallez depuis une boutique).
 
 5) RESTAURER
    • Chaque désinstallation est notée dans backups/<serial>.json.
@@ -95,7 +107,8 @@ DEBLOAT ANDROID — guide d'utilisation
 6) CONSEILS DE SÉCURITÉ
    • La première fois, désinstallez quelques apps à la fois et testez immédiatement.
    • Ne forcez jamais les composants protégés (Play services, WebView, clavier, lanceur…).
-   • En cas de doute sur un paquet inconnu, cherchez « debloat <paquet> » sur le web.
+   • En cas de doute sur un paquet « avancée (non listée) », cherche
+     « debloat <paquet> » sur le web avant de le cocher.
    • Une mise à jour OTA du constructeur réinstalle généralement tout.
    • Un backup illisible est automatiquement mis en quarantaine (*.corrupt-…),
      il n'est jamais écrasé : vérifiez le dossier backups/ si l'app le signale.
@@ -143,7 +156,7 @@ class DebloatApp:
         self.dev_label = ""
         self.last_props: dict[str, str] = {}
         self.packages: dict[str, PackageInfo] = {}
-        self.view = tk.StringVar(value="bloat")
+        self.view = tk.StringVar(value=VIEW_SAFE)
         self.search = tk.StringVar()
         self.busy = False
         self._bkl = threading.Lock()
@@ -182,28 +195,25 @@ class DebloatApp:
 
         left = ttk.Frame(body, width=235)
         left.pack(side="left", fill="y", padx=(0, 8))
-        ttk.Label(left, text="Vue (filtre)", font=("", 10, "bold")).pack(anchor="w", pady=(0, 2))
+        ttk.Label(left, text="Mode", font=("", 10, "bold")).pack(anchor="w", pady=(0, 2))
         for value, text in (
-            ("bloat", "Bloat détecté"),
-            ("protected", "Système (protégé)"),
-            ("system", "Apps système"),
-            ("user", "Apps utilisateur"),
-            ("all", "Tout"),
+            (VIEW_SAFE, "Sûr — recommandées"),
+            (VIEW_ADV, "Avancé — prudence"),
         ):
             ttk.Radiobutton(left, text=text, value=value, variable=self.view,
                             command=self.refresh_tree).pack(anchor="w", pady=1)
         self.lbl_counts = ttk.Label(left, text="", foreground="#55606e", justify="left")
         self.lbl_counts.pack(anchor="w", pady=(8, 4))
 
-        self.btn_sel_safe = ttk.Button(left, text="Cocher les sûrs (vue)",
+        self.btn_sel_safe = ttk.Button(left, text="Cocher les sûres (mode)",
                                        command=lambda: self.select_all(True))
-        self.btn_sel_all = ttk.Button(left, text="Tout cocher (vue)",
+        self.btn_sel_all = ttk.Button(left, text="Tout cocher (mode)",
                                       command=lambda: self.select_all(False))
         self.btn_unsel = ttk.Button(left, text="Décocher tout", command=self.clear_checks)
         self.btn_sel_safe.pack(fill="x", pady=(6, 2))
         self.btn_sel_all.pack(fill="x", pady=2)
         self.btn_unsel.pack(fill="x", pady=2)
-        ttk.Label(left, text="La sélection avancée/inconnue\ndemande des confirmations\nsupplémentaires.",
+        ttk.Label(left, text="Le mode « Avancé » demande\ndes confirmations supplémentaires.",
                   foreground="#a25c00", justify="left").pack(anchor="w", pady=(10, 0))
 
         right = ttk.Frame(body)
@@ -506,12 +516,11 @@ class DebloatApp:
         n_system = sum(counts[("system", r)] for r in RISK_ORDER)
         self.log(f"Scan : {len(pkgs)} apps au total — {n_system} système, "
                  f"{counts[('user', bloat_db.RISK_UNKNOWN)]} utilisateur", "ok")
-        self.log(f"   dont bloat sûr {counts[('system', bloat_db.RISK_SAFE)]} • "
-                 f"avancé {counts[('system', bloat_db.RISK_ADVANCED)]} • "
-                 f"inconnu {counts[('system', bloat_db.RISK_UNKNOWN)]} • "
-                 f"protégé {counts[('system', bloat_db.RISK_FORBIDDEN)]} • "
-                 f"apps utilisateur {counts[('user', bloat_db.RISK_UNKNOWN)]}")
-        self.view.set("bloat")
+        self.log(f"   mode Sûr : {counts[('system', bloat_db.RISK_SAFE)]} • "
+                 f"mode Avancé : {counts[('system', bloat_db.RISK_ADVANCED)] + counts[('system', bloat_db.RISK_UNKNOWN)]} "
+                 f"(dont {counts[('system', bloat_db.RISK_UNKNOWN)]} non listée(s)) — "
+                 f"protégées masquées : {counts[('system', bloat_db.RISK_FORBIDDEN)]}")
+        self.view.set(VIEW_SAFE)
         self.refresh_tree()
         self.q.put(("status", f"Scan fini — {len(pkgs)} apps. "
                             "Coche chaque app à retirer (clic sur la ligne), puis « Désinstaller »."))
@@ -521,26 +530,32 @@ class DebloatApp:
     def _iids(self) -> list[str]:
         query = self.search.get().strip().lower()
         view = self.view.get()
+
         def sort_key(pkg: str):
             info = self.packages[pkg]
             return (RISK_ORDER.get(info.risk, 9), info.label.lower() or pkg.lower(), pkg)
+
+        def matches(info: PackageInfo, pkg: str) -> bool:
+            return (not query or query in pkg.lower()
+                    or query in info.label.lower())
+
         out = []
         for pkg in sorted(self.packages, key=sort_key):
             info = self.packages[pkg]
-            if view == "bloat" and not (info.ptype == "system"
-                                        and info.risk in (bloat_db.RISK_SAFE,
-                                                          bloat_db.RISK_ADVANCED)):
-                continue
-            if view == "protected" and not (info.ptype == "system"
-                                            and info.risk == bloat_db.RISK_FORBIDDEN):
-                continue
-            if view == "system" and info.ptype != "system":
-                continue
-            if view == "user" and info.ptype != "user":
-                continue
-            if query and (query not in pkg.lower() and query not in info.label.lower()):
-                continue
-            out.append(pkg)
+            if matches(info, pkg):
+                if info.ptype == "system" and info.risk == bloat_db.RISK_FORBIDDEN:
+                    # Protégés masqués hors des modes : révélés seulement si la
+                    # recherche nomme explicitement le paquet (ligne verrouillée).
+                    if query:
+                        out.append(pkg)
+                elif view == VIEW_SAFE:
+                    if info.ptype == "system" and info.risk == bloat_db.RISK_SAFE:
+                        out.append(pkg)
+                elif view == VIEW_ADV:
+                    # Mode Avancé : avancées reconnues, non listées et apps utilisateur.
+                    if info.ptype == "user" or info.risk in (
+                            bloat_db.RISK_ADVANCED, bloat_db.RISK_UNKNOWN):
+                        out.append(pkg)
         return out
 
     def refresh_tree(self) -> None:
@@ -554,11 +569,16 @@ class DebloatApp:
                 icon = CHECK_LOCK
             else:
                 icon = CHECK_ON if info.checked else CHECK_OFF
-            risk_txt = (RISK_TEXT.get(info.risk, info.risk)
-                        if info.ptype == "system" else "tierce")
-            tag = f"risk_{info.risk}" if info.ptype == "system" else "risk_user"
+            if info.ptype == "system":
+                risk_txt = RISK_TEXT.get(info.risk, info.risk)
+                tag = f"risk_{info.risk}"
+                type_txt = "système"
+            else:
+                risk_txt = "app utilisateur"
+                tag = "risk_user"
+                type_txt = "utilisateur"
             tree.insert("", "end", iid=pkg, values=(icon, info.package, info.label,
-                                                    risk_txt, info.ptype), tags=(tag,))
+                                                    risk_txt, type_txt), tags=(tag,))
         self._update_counts()
         self._update_actionbar()
         self._set_default_status()
@@ -624,7 +644,7 @@ class DebloatApp:
         if self.busy:
             return
         changed = 0
-        touched_unknown = False
+        touched_unlisted = False
         for pkg in self.tree.get_children(""):
             info = self.packages.get(pkg)
             if info is None or not info.checkable():
@@ -635,14 +655,15 @@ class DebloatApp:
                 info.checked = True
                 changed += 1
                 if info.risk == bloat_db.RISK_UNKNOWN:
-                    touched_unknown = True
+                    touched_unlisted = True
         if changed:
             self.refresh_tree()
-            self.log(f"{changed} app(s) cochée(s) (vue « {self.view.get()} »).")
-            if touched_unknown:
-                self.log("La sélection contient des paquets inconnus — vérifie un par un.", "warn")
+            self.log(f"{changed} app(s) cochée(s) (mode « {self.view.get()} »).")
+            if touched_unlisted:
+                self.log("La sélection contient des paquets non répertoriés — "
+                         "vérifie un par un.", "warn")
         else:
-            self.log("Rien de nouveau à cocher dans la vue courante.")
+            self.log("Rien de nouveau à cocher dans le mode courant.")
 
     def clear_checks(self) -> None:
         if self.busy:
@@ -656,11 +677,11 @@ class DebloatApp:
     def _update_counts(self) -> None:
         c = Counter((info.ptype, info.risk) for info in self.packages.values())
         self.lbl_counts.config(
-            text=(f"Sûrs : {c[('system', bloat_db.RISK_SAFE)]} • "
-                  f"Avancés : {c[('system', bloat_db.RISK_ADVANCED)]}\n"
-                  f"Inconnus système : {c[('system', bloat_db.RISK_UNKNOWN)]} • "
-                  f"Protégés : {c[('system', bloat_db.RISK_FORBIDDEN)]}\n"
-                  f"Apps utilisateur : {c[('user', bloat_db.RISK_UNKNOWN)]}"))
+            text=(f"Sûres : {c[('system', bloat_db.RISK_SAFE)]}\n"
+                  f"Avancées : {c[('system', bloat_db.RISK_ADVANCED)]} "
+                  f"(dont {c[('system', bloat_db.RISK_UNKNOWN)]} non listées)\n"
+                  f"Utilisateur : {c[('user', bloat_db.RISK_UNKNOWN)]}\n"
+                  f"Protégées (verrouillées) : {c[('system', bloat_db.RISK_FORBIDDEN)]}"))
 
     def _update_actionbar(self) -> None:
         n = sum(1 for info in self.packages.values() if info.checked)
@@ -697,46 +718,61 @@ class DebloatApp:
             parent=self.root)
 
     def _confirm_uninstall(self, targets: list[str]) -> bool:
-        n_safe = n_adv = n_unk = n_user = 0
+        """Deux modes de confirmation : Sûr = 1 dialogue, Avancé = 2 dialogues.
+        Les apps utilisateur gardent leur avertissement de suppression définitive."""
+        n_safe = n_adv = n_unlisted = n_user = 0
         for pkg in targets:
             info = self.packages[pkg]
             if info.ptype == "user":
                 n_user += 1
             elif info.risk == bloat_db.RISK_SAFE:
                 n_safe += 1
-            elif info.risk == bloat_db.RISK_ADVANCED:
-                n_adv += 1
             else:
-                n_unk += 1
+                n_adv += 1
+                if info.risk == bloat_db.RISK_UNKNOWN:
+                    n_unlisted += 1
         preview = "\n".join(f"  • {self.packages[p].package}" for p in targets[:12])
         if len(targets) > 12:
             preview += f"\n  … et {len(targets) - 12} autre(s)"
-        text = (f"Tu vas retirer {len(targets)} app(s) :\n\n"
-                f" • {n_safe} « sûres » (bloat classique)\n"
-                f" • {n_adv} « avancées » (une fonctionnalité peut manquer)\n"
-                f" • {n_unk} système(s) INCONNU(E)S hors base (risque élevé)\n"
-                f" • {n_user} app(s) utilisateur (SUPPRESSION DEFINITIVE)\n\n"
+
+        if n_adv == 0 and n_user == 0:
+            text = (f"Retirer {len(targets)} app(s) « sûres » ?\n\n"
+                    f"{preview}\n\n"
+                    "Les apps système restent restaurables (gestionnaire de backups).\n"
+                    "Continuer ?")
+            return messagebox.askyesno("Mode Sûr — confirmation", text, parent=self.root)
+
+        if n_adv == 0 and n_user:
+            # Sélection uniquement utilisateur : le garde-fou de suppression
+            # définitive suffit (pas de mode Avancé impliqué).
+            return messagebox.askyesno(
+                "Apps utilisateur — SUPPRESSION DÉFINITIVE",
+                f"{n_user} app(s) utilisateur seront définitivement supprimées\n"
+                "(données perdues — réinstallables seulement via une boutique).\n\n"
+                "Confirmer ?", parent=self.root, icon="warning")
+
+        text = (f"MODE AVANCÉ — tu vas retirer {len(targets)} app(s) :\n\n"
+                f" • {n_safe} sûre(s)\n"
+                f" • {n_adv} avancée(s) (dont {n_unlisted} non listée(s))\n"
+                f" • {n_user} utilisateur(s) — SUPPRESSION DÉFINITIVE\n\n"
                 f"{preview}\n\n"
-                "Les apps système restent restaurables (gestionnaire de backups).\n"
-                "Les apps utilisateur sont définitivement supprimées.\n\n"
+                "Une fonctionnalité peut manquer après le retrait (cloud, notes,\n"
+                "caméra, réseau…). Les apps système restent restaurables ;\n"
+                "les apps utilisateur, non.\n\n"
                 "Continuer ?")
-        if not messagebox.askyesno("Confirmer la désinstallation", text, parent=self.root):
+        if not messagebox.askyesno("Mode Avancé — confirmation 1/2", text,
+                                   parent=self.root, icon="warning"):
             return False
-        if n_unk and not messagebox.askyesno(
-                "Paquets inconnus",
-                f"{n_unk} paquet(s) système ne figurent pas dans la base de bloat connue.\n"
-                "Leur retrait peut casser des fonctionnalités (caméra, SMS, réseau…).\n\n"
-                "Fais-le vraiment ?", parent=self.root, icon="warning"):
-            return False
-        if n_adv and not messagebox.askyesno(
-                "Apps avancées",
-                f"{n_adv} app(s) « avancées » cochée(s). Certaines apportent des\n"
-                "fonctionnalités utiles (pay, cloud, notes…). Continue ?",
+        if not messagebox.askyesno(
+                "Mode Avancé — confirmation 2/2",
+                "Dernière vérification avant de retirer.\n\n"
+                "Relis les lignes au-dessus : ce retrait est-il vraiment voulu ?\n\n"
+                "Confirmer définitivement ?",
                 parent=self.root, icon="warning"):
             return False
         if n_user and not messagebox.askyesno(
-                "Apps utilisateur",
-                f"{n_user} app(s) utilisateur seront DÉFINITIVEMENT supprimées\n"
+                "Apps utilisateur — SUPPRESSION DÉFINITIVE",
+                f"{n_user} app(s) utilisateur seront définitivement supprimées\n"
                 "(données perdues — réinstallables seulement via une boutique).\n\n"
                 "Confirmer ?", parent=self.root, icon="warning"):
             return False
