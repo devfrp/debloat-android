@@ -25,10 +25,11 @@ from tkinter import ttk, messagebox, filedialog
 import bloat_db
 import backup
 import language
+import theme
 from adb import Adb, AdbError, DeviceInfo
 
 APP_TITLE = "Debloat Android"
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.5.0"
 
 RISK_ORDER = {
     bloat_db.RISK_SAFE: 0,
@@ -222,6 +223,7 @@ class DebloatApp:
 
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
+        theme.apply(root)
         root.title(APP_TITLE)
         root.geometry("1180x760")
         root.minsize(980, 620)
@@ -253,7 +255,7 @@ class DebloatApp:
         # ---------------------------------------------------------- header
         head = ttk.Frame(root)
         head.pack(fill="x", padx=10, pady=(10, 4))
-        self.lbl_dev = ttk.Label(head, text=language.t("device.none"), font=("", 11, "bold"))
+        self.lbl_dev = ttk.Label(head, text=language.t("device.none"), style="Device.TLabel")
         self.lbl_dev.pack(side="left")
         self.btn_help = ttk.Button(head, text=language.t("btn.help"), command=self.show_help)
         self.btn_help.pack(side="right")
@@ -270,14 +272,14 @@ class DebloatApp:
 
         left = ttk.Frame(body, width=235)
         left.pack(side="left", fill="y", padx=(0, 8))
-        ttk.Label(left, text=language.t("mode.header"), font=("", 10, "bold")).pack(anchor="w", pady=(0, 2))
+        ttk.Label(left, text=language.t("mode.header"), style="Header.TLabel").pack(anchor="w", pady=(0, 2))
         for value, text in (
             (VIEW_SAFE, language.t("mode.safe")),
             (VIEW_ADV, language.t("mode.adv")),
         ):
             ttk.Radiobutton(left, text=text, value=value, variable=self.view,
                             command=self.refresh_tree).pack(anchor="w", pady=1)
-        self.lbl_counts = ttk.Label(left, text="", foreground="#55606e", justify="left")
+        self.lbl_counts = ttk.Label(left, text="", style="Muted.TLabel", justify="left")
         self.lbl_counts.pack(anchor="w", pady=(8, 4))
 
         self.btn_sel_safe = ttk.Button(left, text=language.t("btn.check_safe"),
@@ -289,7 +291,7 @@ class DebloatApp:
         self.btn_sel_all.pack(fill="x", pady=2)
         self.btn_unsel.pack(fill="x", pady=2)
         ttk.Label(left, text=language.t("hint.adv"),
-                  foreground="#a25c00", justify="left").pack(anchor="w", pady=(10, 0))
+                  style="Hint.TLabel", justify="left").pack(anchor="w", pady=(10, 0))
 
         right = ttk.Frame(body)
         right.pack(side="left", fill="both", expand=True)
@@ -315,11 +317,11 @@ class DebloatApp:
         xsb = ttk.Scrollbar(right, orient="horizontal", command=self.tree.xview)
         self.tree.configure(yscrollcommand=ysb.set, xscrollcommand=xsb.set)
         for tag, color in (
-            ("risk_safe", "#157a26"),
-            ("risk_advanced", "#b36b00"),
-            ("risk_unknown", "#55606e"),
-            ("risk_forbidden", "#b00020"),
-            ("risk_user", "#55606e"),
+            ("risk_safe", theme.SUCCESS),
+            ("risk_advanced", theme.ACCENT_DEEP),
+            ("risk_unknown", theme.INK_MUTED),
+            ("risk_forbidden", theme.ERROR),
+            ("risk_user", theme.INK_MUTED),
         ):
             self.tree.tag_configure(tag, foreground=color)
         right.rowconfigure(1, weight=1)
@@ -340,7 +342,8 @@ class DebloatApp:
         self.progress = ttk.Progressbar(actions, mode="determinate", length=280)
         self.progress.pack(side="left")
         self.btn_uninstall = ttk.Button(actions, text=language.t("btn.uninstall", n=0),
-                                        command=self.uninstall_selected, state="disabled")
+                                        command=self.uninstall_selected, state="disabled",
+                                        style="Accent.TButton")
         self.btn_uninstall.pack(side="right")
         self.btn_backups = ttk.Button(actions, text=language.t("btn.backups"),
                                       command=self.open_backups)
@@ -350,17 +353,16 @@ class DebloatApp:
 
         log_frame = ttk.LabelFrame(root, text=language.t("log.cluster"))
         log_frame.pack(fill="x", padx=10, pady=(4, 4))
-        self.txt_log = tk.Text(log_frame, height=9, state="disabled", wrap="none",
-                               bg="#15181d", fg="#d7dde5",
-                               font=("Courier New", 9))
+        self.txt_log = tk.Text(log_frame, height=9, state="disabled", wrap="none")
+        theme.graphite_text(self.txt_log)
         ysb_log = ttk.Scrollbar(log_frame, command=self.txt_log.yview)
         self.txt_log.configure(yscrollcommand=ysb_log.set)
-        for tag, color in (("ok", "#5fbf6f"), ("warn", "#e0a340"), ("err", "#ef6a70")):
+        for tag, color in (("ok", theme.LOG_OK), ("warn", theme.LOG_WARN), ("err", theme.LOG_ERR)):
             self.txt_log.tag_configure(tag, foreground=color)
         self.txt_log.pack(side="left", fill="both", expand=True, padx=(6, 0), pady=6)
         ysb_log.pack(side="right", fill="y", pady=6)
 
-        self.lbl_status = ttk.Label(root, text="", anchor="w", relief="sunken")
+        self.lbl_status = ttk.Label(root, text="", anchor="w", style="Status.TLabel")
         self.lbl_status.pack(fill="x", padx=10, pady=(0, 8))
 
         self._update_counts()
@@ -948,8 +950,8 @@ class DebloatApp:
             lb_files.insert("end", os.path.basename(path))
         lb_files.pack(fill="x", padx=10, pady=2)
         lb_files.selection_set(0)
-        txt = tk.Text(win, height=16, state="disabled", wrap="none",
-                      bg="#15181d", fg="#d7dde5", font=("Courier New", 9))
+        txt = tk.Text(win, height=16, state="disabled", wrap="none")
+        theme.graphite_text(txt)
         ysb = ttk.Scrollbar(win, command=txt.yview)
         txt.configure(yscrollcommand=ysb.set)
 
@@ -1086,7 +1088,7 @@ class DebloatApp:
         win.title(language.t("help.title"))
         win.geometry("700x540")
         win.transient(self.root)
-        txt = tk.Text(win, wrap="word", padx=14, pady=10, font=("TkDefaultFont", 10))
+        txt = tk.Text(win, wrap="word", padx=14, pady=10, font=theme.font("body", 10))
         ysb = ttk.Scrollbar(win, command=txt.yview)
         txt.configure(yscrollcommand=ysb.set)
         txt.insert("1.0", help_text())
@@ -1113,7 +1115,7 @@ def ask_language(root: "tk.Tk") -> str:
         win.destroy()
 
     ttk.Label(win, text="Choisis ta langue / Choose your language:",
-              font=("", 11, "bold")).pack(pady=(20, 12))
+              style="Device.TLabel").pack(pady=(20, 12))
     row = ttk.Frame(win)
     row.pack()
     ttk.Button(row, text="Français", width=16,
@@ -1128,10 +1130,7 @@ def ask_language(root: "tk.Tk") -> str:
 def main() -> None:
     root = tk.Tk()
     root.withdraw()
-    try:
-        ttk.Style().theme_use("clam")
-    except tk.TclError:
-        pass
+    theme.apply(root)
     language.set_lang(ask_language(root))
     root.deiconify()
     DebloatApp(root)

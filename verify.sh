@@ -7,14 +7,14 @@ FAILED=0
 step() { echo; echo "== $*"; }
 
 step "Compilation (py_compile)"
-for f in adb.py backup.py bloat_db.py debloat_gui.py debloat_cli.py; do
+for f in adb.py backup.py bloat_db.py theme.py debloat_gui.py debloat_cli.py; do
   python3 -m py_compile "$f" || FAILED=1
 done
 echo "OK — tous les modules compilent."
 
 step "Lint rapide (si pyflakes disponible)"
 if python3 -m pyflakes --version >/dev/null 2>&1; then
-  python3 -m pyflakes adb.py backup.py bloat_db.py debloat_gui.py debloat_cli.py tests/ || FAILED=1
+  python3 -m pyflakes adb.py backup.py bloat_db.py theme.py debloat_gui.py debloat_cli.py tests/ || FAILED=1
 else
   echo "(pyflakes absent — ignoré)"
 fi
