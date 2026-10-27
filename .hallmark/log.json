@@ -1,0 +1,30 @@
+[
+ {
+  "mode": "build",
+  "scope": "page",
+  "shape": "Workbench",
+  "theme": "cobalt",
+  "axes": "light/grotesk-sans/cool",
+  "hero": "Stage",
+  "nav": "masthead",
+  "footer": "colophon block",
+  "imagery": "screenshots 4 (Xvfb, real Tkinter GUI, simulated phone)",
+  "photos": [],
+  "entry": "none",
+  "fingerprint": "workbench-stage-masthead-colophon-switcher-mapping-table-rows-split",
+  "sections": [
+   "hero",
+   "switcher",
+   "mapping",
+   "table",
+   "rows",
+   "split",
+   "footer"
+  ],
+  "signature": "the real scan window over a field of package names thinning left to right",
+  "waived": [],
+  "prompt": "site for debloat-android",
+  "date": "2026-10-27",
+  "draw": "ba26b4"
+ }
+]

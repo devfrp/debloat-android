@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>debloat-android: debloat Android, no root</title>
+  <meta name="description" content="Remove vendor apps from an Android phone over ADB, without root, and put them back in one click. Tkinter GUI and CLI for Linux, Windows and macOS.">
+  <link rel="canonical" href="https://devfrp.github.io/debloat-android/index.en.html">
+  <link rel="alternate" hreflang="fr" href="https://devfrp.github.io/debloat-android/">
+  <link rel="alternate" hreflang="en" href="https://devfrp.github.io/debloat-android/index.en.html">
+  <meta property="og:title" content="debloat-android">
+  <meta property="og:description" content="Debloat Android, no root. Every removal restores in one click.">
+  <meta property="og:image" content="https://devfrp.github.io/debloat-android/assets/gui-safe-en.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script>document.documentElement.classList.add('js')</script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="mast">
+    <div class="container mast-inner">
+      <a class="mast-link" href="https://github.com/devfrp/debloat-android">Code on GitHub</a>
+      <a class="wordmark" href="index.en.html">debloat-android</a>
+      <a class="mast-link mast-link--end" href="./" hreflang="fr" lang="fr">Français</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <canvas class="field" aria-hidden="true"></canvas>
+      <div class="container hero-grid">
+        <div class="hero-text">
+          <h1>Debloat Android, no root.</h1>
+          <p class="lead">Remove vendor apps over ADB, and put them back in one click.</p>
+          <div class="keys" data-dl>
+            <a class="key key--primary" data-os="linux" href="https://github.com/devfrp/debloat-android/releases/latest/download/debloat-android-linux.AppImage">Linux <small>AppImage</small></a>
+            <a class="key" data-os="windows" href="https://github.com/devfrp/debloat-android/releases/latest/download/DebloatAndroid.exe">Windows <small>.exe</small></a>
+            <a class="key" data-os="macos" href="https://github.com/devfrp/debloat-android/releases/latest/download/debloat-android-macos.zip">macOS <small>.zip</small></a>
+          </div>
+          <p class="hero-note">Version 1.4.0, MIT licence. Needs ADB on the computer.</p>
+        </div>
+        <figure class="shot hero-shot">
+          <img src="assets/gui-safe-en.png" width="1180" height="760" fetchpriority="high"
+               alt="The debloat-android window after a scan: Safe mode, thirteen Samsung and Facebook apps listed, four checked, the scan log below.">
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="modes">
+      <div class="container">
+        <div class="head">
+          <h2>Nothing comes pre-checked</h2>
+          <p class="lead">You check every app yourself. Vital OS components stay locked.</p>
+        </div>
+        <div class="tray" role="group" aria-label="Mode">
+          <button class="key" type="button" data-switch="mode-sur" aria-pressed="true">Safe</button>
+          <button class="key" type="button" data-switch="mode-avance" aria-pressed="false">Advanced</button>
+        </div>
+        <figure class="shot switch-panel" id="mode-sur">
+          <img src="assets/gui-safe-clean-en.png" width="1180" height="760" loading="lazy"
+               alt="Safe mode right after the scan: thirteen apps listed, no box checked, the Uninstall selection (0) button greyed out.">
+          <figcaption><strong>Safe:</strong> bloat whose removal is considered harmless. One confirmation.</figcaption>
+        </figure>
+        <figure class="shot switch-panel" id="mode-avance" hidden>
+          <img src="assets/gui-advanced-en.png" width="1180" height="760" loading="lazy"
+               alt="Advanced mode: Bixby, Samsung Pay, Samsung Cloud, Netflix and other system apps to handle with care.">
+          <figcaption><strong>Advanced:</strong> sensitive system apps and unlisted packages. Two confirmations.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="band" id="cli">
+      <div class="container">
+        <div class="head">
+          <h2>The CLI keeps the same guardrails</h2>
+          <p class="lead">Same database, same refusals, same restore ledger. It answers in French.</p>
+        </div>
+        <div class="cli">
+          <div class="cli-strip"><code>debloat_cli.py</code><span>real output, simulated phone</span></div>
+          <div class="cli-row">
+            <pre class="cli-in"><span class="prompt">$</span> python3 debloat_cli.py uninstall <span class="token">com.facebook.appmanager</span> --yes</pre>
+            <span class="elbow" aria-hidden="true"></span>
+            <pre class="cli-out">OK  com.facebook.appmanager retiré.
+consigné dans backups/R5CW00EXAMPLE.json</pre>
+            <span class="exit">exit 0</span>
+          </div>
+          <div class="cli-row">
+            <pre class="cli-in"><span class="prompt">$</span> python3 debloat_cli.py uninstall <span class="token">com.google.android.gms</span> --yes</pre>
+            <span class="elbow" aria-hidden="true"></span>
+            <pre class="cli-out">Refusé : composants système protégés
+   com.google.android.gms   Google Play services</pre>
+            <span class="exit exit--refused">exit 2</span>
+          </div>
+          <div class="cli-row">
+            <pre class="cli-in"><span class="prompt">$</span> python3 debloat_cli.py restore --dry-run</pre>
+            <span class="elbow" aria-hidden="true"></span>
+            <pre class="cli-out">adb -s R5CW00EXAMPLE shell cmd package
+  install-existing com.facebook.appmanager</pre>
+            <span class="exit">exit 0</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="base">
+      <div class="container">
+        <div class="head">
+          <h2>172 known packages, by brand</h2>
+          <p class="lead">A package missing from the database lands in Advanced, never in Safe.</p>
+        </div>
+        <table class="ledger">
+          <thead>
+            <tr><th scope="col">Family</th><th scope="col">Safe</th><th scope="col">Advanced</th><th scope="col">Total</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Google</th><td>14</td><td>35</td><td class="total">49</td></tr>
+            <tr><th scope="row">Samsung</th><td>18</td><td>27</td><td class="total">45</td></tr>
+            <tr><th scope="row">Xiaomi</th><td>9</td><td>13</td><td class="total">22</td></tr>
+            <tr><th scope="row">Unisoc, Oppo, Huawei, Tecno, Sony, LG</th><td>3</td><td>32</td><td class="total">35</td></tr>
+            <tr><th scope="row">Third-party apps and others<span class="note">Facebook, Microsoft, Netflix, Amazon, Doogee</span></th><td>5</td><td>16</td><td class="total">21</td></tr>
+            <tr class="locked"><th scope="row">Locked<span class="note">Play services, WebView, keyboards, launchers, telephony</span></th><td colspan="2">never checkable</td><td class="total">53 + 6 prefixes</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="install">
+      <div class="container">
+        <div class="head">
+          <h2>One file, plus ADB</h2>
+          <p class="lead">On the phone, turn on USB debugging in the developer options.</p>
+        </div>
+        <div class="rows">
+          <div class="row">
+            <h3>Linux</h3>
+            <p><code>debloat-android-linux.AppImage</code> runs as is, nothing to install.</p>
+            <div class="cmd"><code>sudo apt install adb</code><button class="copy" type="button" data-done="Copied" data-fail="Failed">Copy</button></div>
+          </div>
+          <div class="row">
+            <h3>Windows</h3>
+            <p><code>DebloatAndroid.exe</code> and <code>debloat-cli.exe</code>, standalone executables. ADB comes from the platform-tools.</p>
+            <div class="cmd"><code>set ADB_PATH=C:\platform-tools\adb.exe</code><button class="copy" type="button" data-done="Copied" data-fail="Failed">Copy</button></div>
+          </div>
+          <div class="row">
+            <h3>macOS</h3>
+            <p><code>debloat-android-macos.zip</code>: unzip, then open <code>DebloatAndroid.app</code>.</p>
+            <div class="cmd"><code>brew install --cask android-platform-tools</code><button class="copy" type="button" data-done="Copied" data-fail="Failed">Copy</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="close" id="download">
+      <div class="container close-grid">
+        <figure class="shot">
+          <img src="assets/gui-backups-en.png" width="760" height="470" loading="lazy"
+               alt="The backup manager: the phone’s JSON file, the four dated removals and the Restore this backup button.">
+          <figcaption>Every removal is logged with its date. The APK stays on the phone.</figcaption>
+        </figure>
+        <div class="close-text">
+          <h2>One click puts it all back</h2>
+          <p class="lead">The backup manager reinstalls what you removed.</p>
+          <div class="keys" data-dl>
+            <a class="key key--primary" data-os="linux" href="https://github.com/devfrp/debloat-android/releases/latest/download/debloat-android-linux.AppImage">Linux <small>AppImage</small></a>
+            <a class="key" data-os="windows" href="https://github.com/devfrp/debloat-android/releases/latest/download/DebloatAndroid.exe">Windows <small>.exe</small></a>
+            <a class="key" data-os="macos" href="https://github.com/devfrp/debloat-android/releases/latest/download/debloat-android-macos.zip">macOS <small>.zip</small></a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="colophon">
+    <div class="container colophon-inner">
+      <a class="wordmark" href="index.en.html">debloat-android</a>
+      <div>
+        <p>Free software under the MIT licence, by <a href="https://devfrp.github.io/">devfrp</a>. The <a href="https://github.com/devfrp/debloat-android">code</a> and the <a href="https://github.com/devfrp/debloat-android/releases">releases</a> are on GitHub.</p>
+        <p>Screenshots: the real interface, plugged into a simulated phone (a sample Galaxy A54). No real data.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="site.js" defer></script>
+</body>
+</html>
