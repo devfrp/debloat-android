@@ -8,10 +8,11 @@ document.documentElement.classList.add('js');
   const hero = document.querySelector('.hero');
   if (!canvas || !hero) return;
   const ctx = canvas.getContext('2d');
-  const css = getComputedStyle(document.documentElement);
-  const tint = ['--color-glyph-1', '--color-glyph-2', '--color-glyph-3', '--color-glyph-4', '--color-accent-deep']
-    .map((t) => css.getPropertyValue(t).trim());
-  const font = css.getPropertyValue('--font-outlier').trim();
+  const css = () => getComputedStyle(document.documentElement);
+  const tints = () => ['--color-glyph-1', '--color-glyph-2', '--color-glyph-3', '--color-glyph-4', '--color-accent-deep']
+    .map((t) => css().getPropertyValue(t).trim());
+  let tint = tints();
+  const font = css().getPropertyValue('--font-outlier').trim();
   // The bloat the app removes, as the field's text: raw on the left, cleared on the right.
   const text = ('com.samsung.android.app.spage com.facebook.appmanager com.facebook.services ' +
     'com.samsung.android.game.gamehome com.miui.msa.global com.samsung.android.bixby.agent ' +
@@ -79,11 +80,34 @@ document.documentElement.classList.add('js');
   }, { passive: true });
   hero.addEventListener('pointerleave', () => { pointer = null; if (reduce.matches) draw(); });
   addEventListener('resize', resize);
+  document.addEventListener('modechange', () => { tint = tints(); draw(); });
   document.fonts && document.fonts.ready.then(resize);
   resize();
 })();
 
 (() => {
+  // ------------------------------------------------- light / dark mode
+  const root = document.documentElement;
+  const dark = matchMedia('(prefers-color-scheme: dark)');
+  const opts = document.querySelectorAll('[data-mode-set]');
+  const current = () => root.dataset.mode || (dark.matches ? 'dark' : 'light');
+  function sync() {
+    const mode = current();
+    opts.forEach((b) => {
+      b.classList.toggle('active', b.dataset.modeSet === mode);
+      b.setAttribute('aria-pressed', String(b.dataset.modeSet === mode));
+    });
+    document.dispatchEvent(new Event('modechange'));
+  }
+  opts.forEach((b) => b.addEventListener('click', () => {
+    root.dataset.mode = b.dataset.modeSet;
+    try { localStorage.setItem('mode', b.dataset.modeSet); } catch { /* private window: this visit only */ }
+    sync();
+  }));
+  document.querySelectorAll('.mode-toggle').forEach((g) => { g.hidden = false; });
+  dark.addEventListener('change', sync);
+  sync();
+
   // ---------------------------------------------------------- switcher
   const keys = document.querySelectorAll('[data-switch]');
   keys.forEach((key) => key.addEventListener('click', () => {

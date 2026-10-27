@@ -8,24 +8,114 @@ sinon une police système proche prend le relais.
 """
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+import sys
 import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import ttk
 
-# Papier et encre
-PAPER, PAPER2, PAPER3 = "#f8fbfe", "#eff3f8", "#e3e8ef"
-INK, INK_MUTED, INK_FAINT = "#111825", "#5d646e", "#9aa1ab"
-RULE, RULE2 = "#dadee4", "#c2c8cf"
-# Le signal cobalt
-ACCENT, ACCENT_DEEP, ACCENT_EDGE = "#0462d3", "#0040bb", "#003d98"
-ACCENT_WASH, ACCENT_INK = "#e3f0ff", "#f8fbfe"
-# Touches
-KEY_FACE, KEY_EDGE = "#fcfdff", "#b7bec8"
-# Statuts sur papier
-SUCCESS, ERROR = "#21763c", "#be2323"
-# Graphite (journal, détails des backups)
-GRAPHITE, GRAPHITE_INK, GRAPHITE_MUTED = "#121823", "#e3e8ee", "#939ca9"
-LOG_OK, LOG_WARN, LOG_ERR = "#7fcf95", "#75b4ff", "#f2555a"
+PALETTES: dict[str, dict[str, str]] = {
+    "light": {
+        # Papier et encre
+        "PAPER": "#f8fbfe", "PAPER2": "#eff3f8", "PAPER3": "#e3e8ef",
+        "INK": "#111825", "INK_MUTED": "#5d646e", "INK_FAINT": "#9aa1ab",
+        "RULE": "#dadee4", "RULE2": "#c2c8cf",
+        # Le signal cobalt
+        "ACCENT": "#0462d3", "ACCENT_DEEP": "#0040bb", "ACCENT_EDGE": "#003d98",
+        "ACCENT_WASH": "#e3f0ff", "ACCENT_INK": "#f8fbfe",
+        # Touches
+        "KEY_FACE": "#fcfdff", "KEY_EDGE": "#b7bec8",
+        # Statuts sur papier
+        "SUCCESS": "#21763c", "ERROR": "#be2323",
+        # Graphite (journal, détails des backups)
+        "GRAPHITE": "#121823", "GRAPHITE_INK": "#e3e8ee", "GRAPHITE_MUTED": "#939ca9",
+        "LOG_OK": "#7fcf95", "LOG_WARN": "#75b4ff", "LOG_ERR": "#f2555a",
+    },
+    # Re-dérivé du clair, jamais inversé : les surfaces s'éclaircissent avec
+    # l'élévation, l'accent gagne en clarté et perd un peu de saturation.
+    "dark": {
+        "PAPER": "#171e29", "PAPER2": "#10161f", "PAPER3": "#212935",
+        "INK": "#e6ecf2", "INK_MUTED": "#9199a4", "INK_FAINT": "#626a75",
+        "RULE": "#29313d", "RULE2": "#3a4350",
+        "ACCENT": "#498beb", "ACCENT_DEEP": "#85bbfd", "ACCENT_EDGE": "#1f53aa",
+        "ACCENT_WASH": "#172a45", "ACCENT_INK": "#070b12",
+        "KEY_FACE": "#1d2531", "KEY_EDGE": "#0a0e14",
+        "SUCCESS": "#62bb78", "ERROR": "#ef675c",
+        "GRAPHITE": "#0a0e15", "GRAPHITE_INK": "#e3e8ee", "GRAPHITE_MUTED": "#939ca9",
+        "LOG_OK": "#7fcf95", "LOG_WARN": "#75b4ff", "LOG_ERR": "#f2555a",
+    },
+}
+MODES = ("auto", "light", "dark")
+MODE = "light"
+PAPER = PAPER2 = PAPER3 = INK = INK_MUTED = INK_FAINT = RULE = RULE2 = ""
+ACCENT = ACCENT_DEEP = ACCENT_EDGE = ACCENT_WASH = ACCENT_INK = KEY_FACE = KEY_EDGE = ""
+SUCCESS = ERROR = GRAPHITE = GRAPHITE_INK = GRAPHITE_MUTED = LOG_OK = LOG_WARN = LOG_ERR = ""
+globals().update(PALETTES["light"])
+
+
+def system_prefers_dark() -> bool:
+    """Le système demande-t-il un thème sombre ? Faux en cas de doute."""
+    try:
+        if sys.platform == "win32":
+            import winreg
+
+            with winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+            ) as key:
+                return winreg.QueryValueEx(key, "AppsUseLightTheme")[0] == 0
+        if sys.platform == "darwin":
+            out = subprocess.run(["defaults", "read", "-g", "AppleInterfaceStyle"],
+                                 capture_output=True, text=True, timeout=2)
+            return out.stdout.strip().lower() == "dark"
+        if "dark" in os.environ.get("GTK_THEME", "").lower():
+            return True
+        out = subprocess.run(["gsettings", "get", "org.gnome.desktop.interface", "color-scheme"],
+                             capture_output=True, text=True, timeout=2)
+        return "dark" in out.stdout.lower()
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return False
+
+
+def _prefs_path() -> str:
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA") or os.path.expanduser("~")
+    elif sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Application Support")
+    else:
+        base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    return os.path.join(base, "debloat-android", "settings.json")
+
+
+def stored_mode() -> str:
+    """Apparence choisie (« auto » par défaut, ou si le fichier est illisible)."""
+    try:
+        with open(_prefs_path(), encoding="utf-8") as fh:
+            mode = json.load(fh).get("theme", "auto")
+    except (OSError, ValueError, AttributeError):
+        return "auto"
+    return mode if mode in MODES else "auto"
+
+
+def save_mode(mode: str) -> None:
+    path = _prefs_path()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump({"theme": mode}, fh)
+        os.replace(tmp, path)
+    except OSError:
+        pass  # préférence d'affichage : ne jamais bloquer l'application pour ça
+
+
+def resolve(mode: str) -> str:
+    if mode == "auto":
+        return "dark" if system_prefers_dark() else "light"
+    return mode if mode in PALETTES else "light"
+
 
 DISPLAY = ("Familjen Grotesk", "Segoe UI Semibold", "SF Pro Display", "Helvetica Neue",
            "DejaVu Sans", "Helvetica")
@@ -53,8 +143,12 @@ def font(kind: str, size: int, weight: str = "normal") -> tuple:
     return (_fonts.get(kind, ""), size, weight)
 
 
-def apply(root: tk.Tk) -> None:
-    """Applique le thème à toute l'application (ttk et widgets tk classiques)."""
+def apply(root: tk.Tk, mode: str | None = None) -> str:
+    """Applique le thème (« auto », « light » ou « dark » ; par défaut l'apparence
+    enregistrée) à toute l'application ; renvoie le mode effectif."""
+    global MODE
+    MODE = resolve(stored_mode() if mode is None else mode)
+    globals().update(PALETTES[MODE])
     _fonts["display"] = _pick(root, DISPLAY)
     _fonts["body"] = _pick(root, BODY)
     _fonts["mono"] = _pick(root, MONO)
@@ -153,6 +247,7 @@ def apply(root: tk.Tk) -> None:
     root.option_add("*Menu.background", PAPER)
     root.option_add("*Menu.activeBackground", ACCENT)
     root.option_add("*Menu.activeForeground", ACCENT_INK)
+    return MODE
 
 
 def graphite_text(widget: tk.Text) -> None:

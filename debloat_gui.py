@@ -29,7 +29,7 @@ import theme
 from adb import Adb, AdbError, DeviceInfo
 
 APP_TITLE = "Debloat Android"
-APP_VERSION = "1.5.0"
+APP_VERSION = "1.6.0"
 
 RISK_ORDER = {
     bloat_db.RISK_SAFE: 0,
@@ -259,6 +259,15 @@ class DebloatApp:
         self.lbl_dev.pack(side="left")
         self.btn_help = ttk.Button(head, text=language.t("btn.help"), command=self.show_help)
         self.btn_help.pack(side="right")
+        self.theme_var = tk.StringVar(value=theme.stored_mode())
+        self.btn_theme = ttk.Menubutton(head, text=language.t("btn.theme"))
+        menu = tk.Menu(self.btn_theme, tearoff=False)
+        for mode in theme.MODES:
+            menu.add_radiobutton(label=language.t(f"theme.{mode}"), value=mode,
+                                 variable=self.theme_var,
+                                 command=lambda m=mode: self.set_theme(m))
+        self.btn_theme["menu"] = menu
+        self.btn_theme.pack(side="right", padx=6)
         self.btn_scan = ttk.Button(head, text=language.t("btn.scan"),
                                    command=self.scan_packages, state="disabled")
         self.btn_scan.pack(side="right", padx=6)
@@ -316,14 +325,6 @@ class DebloatApp:
         ysb = ttk.Scrollbar(right, orient="vertical", command=self.tree.yview)
         xsb = ttk.Scrollbar(right, orient="horizontal", command=self.tree.xview)
         self.tree.configure(yscrollcommand=ysb.set, xscrollcommand=xsb.set)
-        for tag, color in (
-            ("risk_safe", theme.SUCCESS),
-            ("risk_advanced", theme.ACCENT_DEEP),
-            ("risk_unknown", theme.INK_MUTED),
-            ("risk_forbidden", theme.ERROR),
-            ("risk_user", theme.INK_MUTED),
-        ):
-            self.tree.tag_configure(tag, foreground=color)
         right.rowconfigure(1, weight=1)
         right.columnconfigure(0, weight=1)
         self.tree.grid(row=1, column=0, sticky="nsew")
@@ -354,11 +355,9 @@ class DebloatApp:
         log_frame = ttk.LabelFrame(root, text=language.t("log.cluster"))
         log_frame.pack(fill="x", padx=10, pady=(4, 4))
         self.txt_log = tk.Text(log_frame, height=9, state="disabled", wrap="none")
-        theme.graphite_text(self.txt_log)
         ysb_log = ttk.Scrollbar(log_frame, command=self.txt_log.yview)
         self.txt_log.configure(yscrollcommand=ysb_log.set)
-        for tag, color in (("ok", theme.LOG_OK), ("warn", theme.LOG_WARN), ("err", theme.LOG_ERR)):
-            self.txt_log.tag_configure(tag, foreground=color)
+        self._paint_themed()
         self.txt_log.pack(side="left", fill="both", expand=True, padx=(6, 0), pady=6)
         ysb_log.pack(side="right", fill="y", pady=6)
 
@@ -471,6 +470,26 @@ class DebloatApp:
         self.root.destroy()
 
     # ---------------------------------------------------------- appareils
+
+    def _paint_themed(self) -> None:
+        """Couleurs posées hors des styles ttk : étiquettes de risque, journal."""
+        for tag, color in (
+            ("risk_safe", theme.SUCCESS),
+            ("risk_advanced", theme.ACCENT_DEEP),
+            ("risk_unknown", theme.INK_MUTED),
+            ("risk_forbidden", theme.ERROR),
+            ("risk_user", theme.INK_MUTED),
+        ):
+            self.tree.tag_configure(tag, foreground=color)
+        theme.graphite_text(self.txt_log)
+        for tag, color in (("ok", theme.LOG_OK), ("warn", theme.LOG_WARN), ("err", theme.LOG_ERR)):
+            self.txt_log.tag_configure(tag, foreground=color)
+
+    def set_theme(self, mode: str) -> None:
+        """Change l'apparence à chaud et la mémorise pour les prochains lancements."""
+        theme.save_mode(mode)
+        theme.apply(self.root, mode)
+        self._paint_themed()
 
     def refresh_devices(self) -> None:
         if self.busy:

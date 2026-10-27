@@ -14,6 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <script>try{var m=localStorage.getItem("mode");if(m==="dark"||m==="light")document.documentElement.dataset.mode=m}catch(e){}</script>
   <link rel="stylesheet" href="style.css">
   <script>document.documentElement.classList.add('js')</script>
 </head>
@@ -22,9 +23,15 @@
 
   <header class="mast">
     <div class="container mast-inner">
-      <a class="mast-link" href="https://github.com/devfrp/debloat-android">Code sur GitHub</a>
+      <a class="mast-link" href="https://github.com/devfrp/debloat-android">GitHub</a>
       <a class="wordmark" href="./">debloat-android</a>
-      <a class="mast-link mast-link--end" href="index.en.html" hreflang="en" lang="en">English</a>
+      <div class="mast-end">
+        <div class="mode-toggle" role="group" aria-label="Apparence" hidden>
+          <button class="mode-opt" type="button" data-mode-set="light">Clair</button>
+          <button class="mode-opt" type="button" data-mode-set="dark">Sombre</button>
+        </div>
+        <a class="mast-link" href="index.en.html" hreflang="en" lang="en">English</a>
+      </div>
     </div>
   </header>
 
@@ -40,10 +47,12 @@
             <a class="key" data-os="windows" href="https://github.com/devfrp/debloat-android/releases/latest/download/DebloatAndroid.exe">Windows <small>.exe</small></a>
             <a class="key" data-os="macos" href="https://github.com/devfrp/debloat-android/releases/latest/download/debloat-android-macos.zip">macOS <small>.zip</small></a>
           </div>
-          <p class="hero-note">Version 1.5.0, licence MIT. Il faut ADB sur l’ordinateur.</p>
+          <p class="hero-note">Version 1.6.0, licence MIT. Il faut ADB sur l’ordinateur.</p>
         </div>
         <figure class="shot hero-shot">
-          <img src="assets/gui-safe-fr.png" width="1180" height="760" fetchpriority="high"
+          <img class="only-light" src="assets/gui-safe-fr.png" width="1180" height="760" fetchpriority="high"
+               alt="La fenêtre de debloat-android après un scan : mode Sûr, treize applis Samsung et Facebook listées, quatre cochées, journal du scan en bas.">
+          <img class="only-dark" src="assets/gui-safe-fr-dark.png" width="1180" height="760" loading="lazy"
                alt="La fenêtre de debloat-android après un scan : mode Sûr, treize applis Samsung et Facebook listées, quatre cochées, journal du scan en bas.">
         </figure>
       </div>
@@ -60,12 +69,16 @@
           <button class="key" type="button" data-switch="mode-avance" aria-pressed="false">Avancé</button>
         </div>
         <figure class="shot switch-panel" id="mode-sur">
-          <img src="assets/gui-safe-clean-fr.png" width="1180" height="760" loading="lazy"
+          <img class="only-light" src="assets/gui-safe-clean-fr.png" width="1180" height="760" loading="lazy"
+               alt="Mode Sûr juste après le scan : treize applis listées, aucune case cochée, bouton Désinstaller la sélection (0) grisé.">
+          <img class="only-dark" src="assets/gui-safe-clean-fr-dark.png" width="1180" height="760" loading="lazy"
                alt="Mode Sûr juste après le scan : treize applis listées, aucune case cochée, bouton Désinstaller la sélection (0) grisé.">
           <figcaption><strong>Sûr :</strong> le bloat dont le retrait est jugé sans risque. Une confirmation suffit.</figcaption>
         </figure>
         <figure class="shot switch-panel" id="mode-avance" hidden>
-          <img src="assets/gui-advanced-fr.png" width="1180" height="760" loading="lazy"
+          <img class="only-light" src="assets/gui-advanced-fr.png" width="1180" height="760" loading="lazy"
+               alt="Mode Avancé : Bixby, Samsung Pay, Samsung Cloud, Netflix et d’autres applis système à manier avec prudence.">
+          <img class="only-dark" src="assets/gui-advanced-fr-dark.png" width="1180" height="760" loading="lazy"
                alt="Mode Avancé : Bixby, Samsung Pay, Samsung Cloud, Netflix et d’autres applis système à manier avec prudence.">
           <figcaption><strong>Avancé :</strong> applis système sensibles et paquets non listés. Deux confirmations.</figcaption>
         </figure>
@@ -156,7 +169,9 @@ consigné dans backups/R5CW00EXAMPLE.json</pre>
     <section class="close" id="telecharger">
       <div class="container close-grid">
         <figure class="shot">
-          <img src="assets/gui-backups-fr.png" width="760" height="470" loading="lazy"
+          <img class="only-light" src="assets/gui-backups-fr.png" width="760" height="470" loading="lazy"
+               alt="Le gestionnaire de backups : le fichier JSON du téléphone, les quatre retraits datés, et le bouton Restaurer ce backup.">
+          <img class="only-dark" src="assets/gui-backups-fr-dark.png" width="760" height="470" loading="lazy"
                alt="Le gestionnaire de backups : le fichier JSON du téléphone, les quatre retraits datés, et le bouton Restaurer ce backup.">
           <figcaption>Chaque retrait est noté avec sa date. L’APK reste sur le téléphone.</figcaption>
         </figure>

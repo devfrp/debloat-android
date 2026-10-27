@@ -76,6 +76,10 @@ STRINGS = {
     },
     # ------------------------------------------------------------ boutons
     "btn.help": {"fr": "Aide", "en": "Help"},
+    "btn.theme": {"fr": "Apparence", "en": "Appearance"},
+    "theme.auto": {"fr": "Comme le système", "en": "Like the system"},
+    "theme.light": {"fr": "Claire", "en": "Light"},
+    "theme.dark": {"fr": "Sombre", "en": "Dark"},
     "btn.scan": {"fr": "Scanner les applications", "en": "Scan apps"},
     "btn.refresh": {"fr": "Rafraîchir les appareils", "en": "Refresh devices"},
     "btn.uninstall": {
